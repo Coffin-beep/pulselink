@@ -1,0 +1,16 @@
+{
+  "name": "pulselink",
+  "version": "0.1.0",
+  "description": "PulseLink messenger prototype with text chats, voice messages, communities, admin panel, SSE and a dependency-free WebSocket voice relay.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "HOST=0.0.0.0 PORT=3000 node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}
