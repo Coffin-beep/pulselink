@@ -352,6 +352,7 @@
     let lastText = chat.description || 'Нет сообщений';
     if (last) lastText = last.kind === 'voice' ? '🎙 Голосовое сообщение' : last.text;
     const voiceCount = (chat.voiceStates || []).reduce((sum, room) => sum + (room.users?.length || 0), 0);
+    const lastTime = last?.createdAt ? formatTime(last.createdAt) : '';
     return `
       <button class="chat-item ${chat.id === state.selectedChatId ? 'active' : ''}" data-chat-id="${chat.id}">
         ${chatIconHtml(chat)}
@@ -360,6 +361,7 @@
           <span class="chat-last">${escapeHtml(lastText)}</span>
         </span>
         <span class="chat-badges">
+          ${lastTime ? `<span class="chat-time">${lastTime}</span>` : ''}
           ${chat.unread ? `<span class="badge">${chat.unread}</span>` : ''}
           ${voiceCount ? `<span class="type-pill">🎧 ${voiceCount}</span>` : `<span class="type-pill">${typeLabel(chat)}</span>`}
         </span>
