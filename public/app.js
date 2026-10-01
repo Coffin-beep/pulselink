@@ -15,7 +15,7 @@
     eventSource: null,
     pollTimer: null,
     sidebarOpen: false,
-    detailsOpen: false,
+    detailsOpen: typeof window !== 'undefined' && window.matchMedia('(min-width: 1181px)').matches,
     search: '',
     authMode: 'login',
     recording: null,
@@ -108,6 +108,20 @@
     }, 3600);
   }
 
+
+  function logoHtml(extra = '') {
+    return `
+      <div class="logo-mark ${extra}" aria-label="PulseLink logo" role="img">
+        <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+          <path class="logo-bubble" d="M17 31.5C17 22.4 23.9 16 32.4 16C41.4 16 48 22.7 48 31.4C48 40.4 41.1 47 31.8 47H20.4L24.8 42.2C20 39.8 17 35.9 17 31.5Z"/>
+          <path class="logo-link" d="M14 33H24.1L28.4 24L35.5 42L40.4 32H50"/>
+          <circle class="logo-node left" cx="18" cy="33" r="4"/>
+          <circle class="logo-node right" cx="49" cy="32" r="4"/>
+        </svg>
+      </div>
+    `;
+  }
+
   function avatarHtml(entity, size = '', fallback = 'P') {
     const cls = ['avatar', size].filter(Boolean).join(' ');
     if (entity?.avatar) return `<img class="${cls}" src="${entity.avatar}" alt="">`;
@@ -155,7 +169,7 @@
         <section class="auth-hero">
           <div>
             <div class="brand-lockup">
-              <div class="logo-mark">P</div>
+              ${logoHtml()}
               <div>
                 <div class="brand-title">PulseLink</div>
                 <div class="brand-subtitle">мессенджер нового поколения</div>
@@ -178,11 +192,11 @@
           </div>
           <form id="auth-form" class="form-stack">
             ${state.authMode === 'login' ? `
-              <label class="field"><span>@username или почта</span><input class="input" name="login" autocomplete="username" placeholder="@coffin" required></label>
+              <label class="field"><span>@username или почта</span><input class="input" name="login" autocomplete="username" placeholder="@coffin" data-username-input data-allow-email="true" required></label>
               <label class="field"><span>Пароль</span><input class="input" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required></label>
               <div class="hint">Для первого запуска создан главный администратор <b>@coffin</b>. Пароль по умолчанию: <b>PulseLink2026!</b> (изменяется переменной PULSELINK_ADMIN_PASSWORD).</div>
             ` : `
-              <label class="field"><span>Username</span><input class="input" name="username" autocomplete="username" placeholder="@pulse" pattern="^@?[a-zA-Z0-9_]{3,24}$" required></label>
+              <label class="field"><span>Username</span><input class="input" name="username" autocomplete="username" placeholder="@pulse" pattern="^@?[a-zA-Z0-9_]{3,24}$" data-username-input required></label>
               <label class="field"><span>Nickname</span><input class="input" name="nickname" autocomplete="name" placeholder="Ваше имя" maxlength="48" required></label>
               <label class="field"><span>Почта (обязательно)</span><input class="input" name="email" type="email" autocomplete="email" placeholder="you@example.com" required></label>
               <label class="field"><span>Пароль</span><input class="input" name="password" type="password" autocomplete="new-password" minlength="6" placeholder="минимум 6 символов" required></label>
@@ -195,11 +209,56 @@
     `;
     $$('[data-auth-tab]').forEach((button) => {
       button.addEventListener('click', () => {
-        state.authMode = button.dataset.authTab;
-        renderAuth();
+        if (state.authMode === button.dataset.authTab) return;
+        const card = $('.auth-card');
+        button.classList.add('is-pressing');
+        card?.classList.add('switching');
+        setTimeout(() => {
+          state.authMode = button.dataset.authTab;
+          renderAuth();
+        }, 170);
       });
     });
+    $$('[data-username-input]').forEach((input) => wireUsernameAutoprefix(input, { allowEmail: input.dataset.allowEmail === 'true' }));
     $('#auth-form').addEventListener('submit', handleAuthSubmit);
+  }
+
+
+  function looksLikeEmail(value) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+  }
+
+  function normalizeUsernameForSubmit(value, allowEmail = false) {
+    const trimmed = String(value || '').trim();
+    if (!trimmed) return trimmed;
+    if (allowEmail && looksLikeEmail(trimmed)) return trimmed;
+    return trimmed.startsWith('@') ? trimmed : `@${trimmed}`;
+  }
+
+  function wireUsernameAutoprefix(input, { allowEmail = false } = {}) {
+    const fix = () => {
+      const raw = input.value.trimStart();
+      if (!raw) return;
+      if (allowEmail && !raw.startsWith('@') && (raw.includes('.') || looksLikeEmail(raw))) return;
+      if (allowEmail && raw.includes('@') && !raw.startsWith('@')) return;
+      const cleaned = raw.startsWith('@') ? `@${raw.slice(1).replace(/@+/g, '')}` : `@${raw.replace(/^@+/, '')}`;
+      if (input.value !== cleaned) {
+        const caret = Math.max(1, input.selectionStart || cleaned.length);
+        input.value = cleaned;
+        requestAnimationFrame(() => input.setSelectionRange(Math.min(cleaned.length, caret + 1), Math.min(cleaned.length, caret + 1)));
+      }
+    };
+    input.addEventListener('focus', () => {
+      if (!allowEmail && !input.value) {
+        input.value = '@';
+        requestAnimationFrame(() => input.setSelectionRange(1, 1));
+      }
+    });
+    input.addEventListener('input', fix);
+    input.addEventListener('blur', () => {
+      if (input.value === '@') input.value = '';
+      if (input.value && !allowEmail) input.value = normalizeUsernameForSubmit(input.value);
+    });
   }
 
   async function handleAuthSubmit(event) {
@@ -207,8 +266,14 @@
     const form = event.currentTarget;
     const errorBox = $('#auth-error');
     errorBox.textContent = '';
+    const submitButton = form.querySelector('button[type=submit]');
     const body = Object.fromEntries(new FormData(form).entries());
+    if (body.username) body.username = normalizeUsernameForSubmit(body.username);
+    if (body.login && !looksLikeEmail(body.login)) body.login = normalizeUsernameForSubmit(body.login, true);
     const endpoint = state.authMode === 'login' ? '/api/login' : '/api/register';
+    form.classList.add('auth-submitting');
+    submitButton?.classList.add('is-loading');
+    if (submitButton) submitButton.disabled = true;
     try {
       const data = await api(endpoint, { method: 'POST', body: JSON.stringify(body) });
       state.token = data.token;
@@ -221,6 +286,9 @@
       toast('Добро пожаловать в PulseLink', 'success');
     } catch (error) {
       errorBox.textContent = error.message;
+      form.classList.remove('auth-submitting');
+      submitButton?.classList.remove('is-loading');
+      if (submitButton) submitButton.disabled = false;
     }
   }
 
@@ -271,10 +339,19 @@
       `;
       state.lastRenderedShell = true;
     }
+    updateShellLayout();
     renderSidebar();
     renderChat();
     renderDetails();
     renderVoiceControls();
+  }
+
+
+  function updateShellLayout() {
+    if (!app.classList.contains('app-shell')) return;
+    app.classList.toggle('details-open', Boolean(state.detailsOpen));
+    app.classList.toggle('details-collapsed', !state.detailsOpen);
+    app.classList.toggle('sidebar-open', Boolean(state.sidebarOpen));
   }
 
   function applySettings() {
@@ -300,7 +377,7 @@
     sidebar.innerHTML = `
       <div class="sidebar-header">
         <div class="brand-lockup">
-          <div class="logo-mark">P</div>
+          ${logoHtml()}
           <div>
             <div class="brand-title" style="font-size:24px">PulseLink</div>
             <div class="brand-subtitle">живой мессенджер</div>
@@ -401,7 +478,7 @@
     if (!chat) {
       pane.innerHTML = `
         <div class="chat-header"><button class="round-btn mobile-menu-btn" data-mobile-menu>☰</button><div class="chat-header-title">PulseLink</div></div>
-        <div class="messages"><div class="empty-state"><div class="logo-mark">P</div><h2>Выберите чат</h2><p>Создайте личный чат, группу или найдите публичное сообщество в обзоре.</p></div></div>
+        <div class="messages"><div class="empty-state">${logoHtml('large-logo')}<h2>Выберите чат</h2><p>Создайте личный чат, группу или найдите публичное сообщество в обзоре.</p></div></div>
       `;
       $('[data-mobile-menu]', pane)?.addEventListener('click', () => toggleSidebar());
       return;
@@ -418,7 +495,7 @@
           <div class="chat-header-sub">${escapeHtml(memberSummary)}${chat.type === 'channel' ? ' · публикуют админы' : ''}</div>
         </div>
         <div class="header-actions">
-          <button class="round-btn" data-details-toggle title="Информация">ℹ️</button>
+          <button class="round-btn ${state.detailsOpen ? 'active' : ''}" data-details-toggle title="Информация">ℹ️</button>
         </div>
       </header>
       <div id="messages" class="messages"></div>
@@ -688,6 +765,7 @@
   function renderDetails() {
     const pane = $('#detailsPane');
     if (!pane) return;
+    updateShellLayout();
     pane.classList.toggle('open', state.detailsOpen);
     const chat = selectedChat();
     if (!chat) {
@@ -712,6 +790,7 @@
     $$('[data-join-voice]', pane).forEach((button) => button.addEventListener('click', () => joinVoice(chat.id, button.dataset.joinVoice, false)));
     $$('[data-listen-voice]', pane).forEach((button) => button.addEventListener('click', () => joinVoice(chat.id, button.dataset.listenVoice, true)));
     $('[data-add-voice-channel]', pane)?.addEventListener('submit', addVoiceChannel);
+    $$('[data-username-input]', pane).forEach((input) => wireUsernameAutoprefix(input));
     $('[data-add-member]', pane)?.addEventListener('submit', addMember);
     $$('[data-member-action]', pane).forEach((button) => button.addEventListener('click', handleMemberAction));
     $('[data-leave-chat]', pane)?.addEventListener('click', leaveChat);
@@ -787,7 +866,7 @@
         <div class="panel-title"><span>Участники</span><span class="badge">${members.length}</span></div>
         ${chat.canAdmin && ['group', 'channel'].includes(chat.type) ? `
           <form class="form-stack" data-add-member style="margin-bottom:12px">
-            <input class="input" name="username" placeholder="Добавить @username" required>
+            <input class="input" name="username" placeholder="@username" data-username-input required>
             <button class="secondary-btn" type="submit">Добавить</button>
           </form>
         ` : ''}
@@ -833,7 +912,7 @@
   async function addMember(event) {
     event.preventDefault();
     const chat = selectedChat();
-    const username = new FormData(event.currentTarget).get('username');
+    const username = normalizeUsernameForSubmit(new FormData(event.currentTarget).get('username'));
     try {
       const data = await api(`/api/chats/${chat.id}/members`, { method: 'POST', body: JSON.stringify({ username }) });
       replaceChat(data.chat);
@@ -888,11 +967,14 @@
 
   function toggleSidebar(force) {
     state.sidebarOpen = typeof force === 'boolean' ? force : !state.sidebarOpen;
+    updateShellLayout();
     renderSidebar();
   }
 
   function toggleDetails(force) {
     state.detailsOpen = typeof force === 'boolean' ? force : !state.detailsOpen;
+    updateShellLayout();
+    renderChat();
     renderDetails();
   }
 
@@ -919,13 +1001,14 @@
   function showNewDirectModal() {
     const body = openModal('Новый личный чат', `
       <form id="newDmForm" class="form-stack">
-        <label class="field"><span>@username</span><input class="input" name="username" placeholder="@friend" required></label>
+        <label class="field"><span>@username</span><input class="input" name="username" placeholder="@friend" data-username-input required></label>
         <button class="primary-btn" type="submit">Открыть чат</button>
       </form>
     `);
+    $$('[data-username-input]', body).forEach((input) => wireUsernameAutoprefix(input));
     $('#newDmForm', body).addEventListener('submit', async (event) => {
       event.preventDefault();
-      const username = new FormData(event.currentTarget).get('username');
+      const username = normalizeUsernameForSubmit(new FormData(event.currentTarget).get('username'));
       try {
         const data = await api('/api/chats/direct', { method: 'POST', body: JSON.stringify({ username }) });
         replaceChat(data.chat);

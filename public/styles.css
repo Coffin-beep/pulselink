@@ -1224,3 +1224,183 @@ tr:hover td { background: rgba(255,255,255,0.03); }
   .auth-page { padding: 14px; }
   .auth-hero h1 { font-size: clamp(38px, 12vw, 58px); }
 }
+
+/* UX refinement: brand mark, auth micro-interactions and working collapsible details pane. */
+.logo-mark {
+  overflow: hidden;
+  isolation: isolate;
+  flex: 0 0 auto;
+}
+.logo-mark svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  filter: drop-shadow(0 12px 22px rgba(6, 182, 212, 0.16));
+}
+.logo-mark .logo-bubble {
+  fill: rgba(255,255,255,0.12);
+  stroke: rgba(255,255,255,0.30);
+  stroke-width: 1.4;
+}
+.logo-mark .logo-link {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 4.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 74;
+  stroke-dashoffset: 0;
+  animation: logoPulseLine 3.8s ease-in-out infinite;
+}
+.logo-mark .logo-node {
+  fill: #ffffff;
+  stroke: rgba(6, 182, 212, 0.55);
+  stroke-width: 2;
+  transform-origin: center;
+  animation: logoNodePulse 2.1s ease-in-out infinite;
+}
+.logo-mark .logo-node.right { animation-delay: .28s; }
+.logo-mark.large-logo {
+  width: 86px;
+  height: 86px;
+  border-radius: 30px;
+}
+@keyframes logoPulseLine {
+  0%, 100% { stroke-dashoffset: 0; filter: drop-shadow(0 0 0 rgba(255,255,255,0)); }
+  45% { stroke-dashoffset: -22; filter: drop-shadow(0 0 9px rgba(255,255,255,.34)); }
+}
+@keyframes logoNodePulse {
+  0%, 100% { transform: scale(1); opacity: .94; }
+  50% { transform: scale(1.18); opacity: 1; }
+}
+
+.auth-page {
+  animation: authPageIn .55s cubic-bezier(.2,.8,.2,1) both;
+}
+.auth-hero {
+  animation: authHeroFloat .8s cubic-bezier(.2,.8,.2,1) both;
+}
+.auth-card {
+  position: relative;
+  overflow: hidden;
+  animation: authCardIn .62s cubic-bezier(.2,.8,.2,1) .08s both;
+}
+.auth-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 0%, rgba(255,255,255,.11) 36%, transparent 58%);
+  transform: translateX(-120%);
+  animation: authSheen 5.5s ease-in-out infinite;
+}
+.auth-card.switching {
+  animation: authSwitchOut .17s ease forwards;
+}
+.auth-tabs button {
+  position: relative;
+  overflow: hidden;
+  transition: transform .16s ease, color .16s ease, background .16s ease, box-shadow .16s ease;
+}
+.auth-tabs button::after {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 0;
+  height: 0;
+  border-radius: 999px;
+  background: rgba(255,255,255,.24);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+}
+.auth-tabs button.is-pressing::after {
+  animation: tabRipple .38s ease-out;
+}
+.auth-tabs button:active,
+.primary-btn:active,
+.secondary-btn:active,
+.ghost-btn:active,
+.round-btn:active {
+  transform: translateY(1px) scale(.985);
+}
+.auth-submitting {
+  pointer-events: none;
+  filter: saturate(.92);
+}
+.primary-btn.is-loading {
+  position: relative;
+  color: transparent !important;
+}
+.primary-btn.is-loading::after {
+  content: "";
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 2px solid rgba(255,255,255,.45);
+  border-top-color: #fff;
+  position: absolute;
+  animation: spin .78s linear infinite;
+}
+@keyframes authPageIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes authHeroFloat { from { opacity: 0; transform: translateY(16px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes authCardIn { from { opacity: 0; transform: translateY(18px) scale(.975); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes authSwitchOut { to { opacity: .35; transform: translateY(8px) scale(.985); filter: blur(4px); } }
+@keyframes authSheen { 0%, 58% { transform: translateX(-120%); } 76%, 100% { transform: translateX(120%); } }
+@keyframes tabRipple { from { width: 0; height: 0; opacity: .55; } to { width: 220px; height: 220px; opacity: 0; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.field:has([data-username-input]) { position: relative; }
+.field:has([data-username-input]) .input {
+  letter-spacing: .01em;
+  font-weight: 650;
+}
+
+@media (min-width: 1181px) {
+  .app-shell {
+    transition: grid-template-columns .24s ease, gap .24s ease;
+  }
+  .app-shell.details-collapsed {
+    grid-template-columns: var(--sidebar) minmax(0, 1fr);
+  }
+  .app-shell.details-collapsed .details-pane {
+    display: none;
+  }
+  .app-shell.details-open .details-pane {
+    display: flex;
+    animation: detailsIn .22s cubic-bezier(.2,.8,.2,1) both;
+  }
+}
+@keyframes detailsIn { from { opacity: 0; transform: translateX(12px) scale(.99); } to { opacity: 1; transform: translateX(0) scale(1); } }
+.details-header .round-btn[data-close-details] {
+  background: rgba(255,255,255,0.075);
+  font-size: 22px;
+  line-height: 1;
+}
+.header-actions .round-btn.active {
+  border-color: rgba(6,182,212,.45);
+  background: linear-gradient(135deg, rgba(139,92,246,.30), rgba(6,182,212,.18));
+  box-shadow: 0 14px 35px rgba(6,182,212,.12), inset 0 1px 0 rgba(255,255,255,.14);
+}
+.chat-header > div:nth-of-type(1) {
+  min-width: 0;
+}
+.chat-header-title,
+.modal-title,
+.panel-title {
+  text-wrap: balance;
+}
+.message-row .avatar,
+.message-row .avatar-fallback {
+  margin-bottom: 2px;
+}
+.panel-card,
+.discover-card,
+.member-row,
+.voice-channel {
+  transition: transform .14s ease, background .14s ease, border-color .14s ease, box-shadow .14s ease;
+}
+.panel-card:hover,
+.voice-channel:hover {
+  border-color: rgba(148,163,184,.20);
+  box-shadow: 0 18px 44px rgba(2,6,23,.20), inset 0 1px 0 rgba(255,255,255,.06);
+}
