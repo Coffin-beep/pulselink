@@ -1060,8 +1060,8 @@
     renderDetails();
   }
 
-  function openModal(title, bodyHtml, { wide = false, compact = false } = {}) {
-    const modalClass = ['modal', wide ? 'wide' : '', compact ? 'compact' : ''].filter(Boolean).join(' ');
+  function openModal(title, bodyHtml, { wide = false, compact = false, profileSettings = false } = {}) {
+    const modalClass = ['modal', wide ? 'wide' : '', compact ? 'compact' : '', profileSettings ? 'profile-settings-modal' : ''].filter(Boolean).join(' ');
     modalRoot.innerHTML = `
       <div class="modal-backdrop" data-modal-backdrop>
         <section class="${modalClass}" role="dialog" aria-modal="true">
@@ -1214,30 +1214,49 @@
   function showSettingsModal() {
     let avatar = state.me.avatar || '';
     const s = settings();
-    const body = openModal('Настройки', `
-      <form id="settingsForm" class="modal-grid">
-        <div class="avatar-upload">
-          <span id="profileAvatarWrap">${avatar ? `<img class="avatar large" src="${avatar}" alt="">` : avatarHtml(state.me, 'large')}</span>
-          <div>
-            <label class="secondary-btn" for="profileAvatarInput">Загрузить аватар</label>
+    const scaleValue = Math.round((Number(s.uiScale) || 1) * 100);
+    const body = openModal('Профиль и настройки', `
+      <form id="settingsForm" class="profile-settings-form">
+        <section class="settings-profile-card">
+          <div id="profileAvatarWrap" class="settings-avatar-wrap">${avatar ? `<img class="avatar large" src="${avatar}" alt="">` : avatarHtml(state.me, 'large')}</div>
+          <div class="settings-profile-copy">
+            <strong>${escapeHtml(state.me.nickname)}</strong>
+            <span>${escapeHtml(state.me.username)}${state.me.email ? ` · ${escapeHtml(state.me.email)}` : ''}</span>
+            <label class="ghost-btn compact-upload" for="profileAvatarInput">Сменить фото</label>
             <input id="profileAvatarInput" type="file" accept="image/*" hidden>
-            <div class="hint">Обрезка квадратом + сжатие на клиенте, хранение dataURL.</div>
           </div>
-        </div>
-        <label class="field"><span>Nickname</span><input class="input" name="nickname" value="${escapeHtml(state.me.nickname)}" maxlength="48" required></label>
-        <div class="two-col">
-          <label class="check-row"><input type="checkbox" name="messageSound" ${s.messageSound ? 'checked' : ''}><span>Звук сообщений</span></label>
-          <label class="check-row"><input type="checkbox" name="notifications" ${s.notifications ? 'checked' : ''}><span>Системные уведомления</span></label>
-          <label class="check-row"><input type="checkbox" name="compactMode" ${s.compactMode ? 'checked' : ''}><span>Компактный режим</span></label>
-          <label class="field"><span>Отправка</span><select class="select" name="sendMode"><option value="enter" ${s.sendMode === 'enter' ? 'selected' : ''}>Enter</option><option value="ctrlEnter" ${s.sendMode === 'ctrlEnter' ? 'selected' : ''}>Ctrl+Enter</option></select></label>
-        </div>
-        <label class="field scale-field"><span>Масштаб интерфейса: <b id="uiScaleValue">${Math.round((Number(s.uiScale) || 1) * 100)}%</b></span><input class="range-input" name="uiScale" type="range" min="85" max="120" step="5" value="${Math.round((Number(s.uiScale) || 1) * 100)}"></label>
-        <div class="settings-actions">
-          <button class="danger-btn" type="button" id="settingsLogout">${iconHtml('logout')} Выйти из аккаунта</button>
+        </section>
+
+        <label class="field settings-nickname-field">
+          <span>Имя профиля</span>
+          <input class="input" name="nickname" value="${escapeHtml(state.me.nickname)}" maxlength="48" required>
+        </label>
+
+        <section class="settings-section">
+          <div class="settings-section-title">Уведомления</div>
+          <div class="settings-toggle-list">
+            <label class="settings-toggle"><input type="checkbox" name="messageSound" ${s.messageSound ? 'checked' : ''}><span class="toggle-switch"></span><span><strong>Звук сообщений</strong><small>Короткий сигнал при новых сообщениях</small></span></label>
+            <label class="settings-toggle"><input type="checkbox" name="notifications" ${s.notifications ? 'checked' : ''}><span class="toggle-switch"></span><span><strong>Системные уведомления</strong><small>Показывать уведомления браузера</small></span></label>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <div class="settings-section-title">Интерфейс</div>
+          <div class="settings-toggle-list">
+            <label class="settings-toggle"><input type="checkbox" name="compactMode" ${s.compactMode ? 'checked' : ''}><span class="toggle-switch"></span><span><strong>Компактный режим</strong><small>Меньше отступов в списках и сообщениях</small></span></label>
+          </div>
+          <div class="settings-grid-compact">
+            <label class="field"><span>Отправка сообщений</span><select class="select" name="sendMode"><option value="enter" ${s.sendMode === 'enter' ? 'selected' : ''}>Enter</option><option value="ctrlEnter" ${s.sendMode === 'ctrlEnter' ? 'selected' : ''}>Ctrl+Enter</option></select></label>
+            <label class="field scale-field"><span>Масштаб: <b id="uiScaleValue">${scaleValue}%</b></span><input class="range-input" name="uiScale" type="range" min="85" max="120" step="5" value="${scaleValue}"></label>
+          </div>
+        </section>
+
+        <div class="settings-actions minimal-settings-actions">
+          <button class="danger-btn" type="button" id="settingsLogout">${iconHtml('logout')} Выйти</button>
           <button class="primary-btn" type="submit">Сохранить</button>
         </div>
       </form>
-    `);
+    `, { profileSettings: true });
     $('#profileAvatarInput', body).addEventListener('change', async (event) => {
       const file = event.target.files?.[0];
       if (!file) return;
