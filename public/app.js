@@ -10,7 +10,7 @@
     me: null,
     chats: [],
     messages: new Map(),
-    selectedChatId: localStorage.getItem('pulselink_selected_chat') || '',
+    selectedChatId: '',
     online: new Map(),
     eventSource: null,
     pollTimer: null,
@@ -28,7 +28,7 @@
     notifications: false,
     sendMode: 'enter',
     compactMode: false,
-    chatBackground: 'gradient'
+    uiScale: 1
   };
 
   const $ = (selector, root = document) => root.querySelector(selector);
@@ -74,6 +74,23 @@
 
   function settings() {
     return { ...defaultSettings, ...(state.me?.settings || {}) };
+  }
+
+  function selectedChatStorageKey(userId = state.me?.id) {
+    return userId ? `pulselink:selected-chat:${userId}` : 'pulselink:selected-chat:anonymous';
+  }
+
+
+  function rememberSelectedChat(chatId) {
+    if (!state.me?.id || !chatId) return;
+    localStorage.setItem(selectedChatStorageKey(), chatId);
+  }
+
+  function resetUserScopedState(user = null) {
+    state.chats = [];
+    state.messages.clear();
+    state.search = '';
+    state.selectedChatId = user ? (localStorage.getItem(selectedChatStorageKey(user.id)) || '') : '';
   }
 
   async function api(path, options = {}) {
@@ -146,6 +163,7 @@
     try {
       const data = await api('/api/me');
       state.me = data.user;
+      resetUserScopedState(data.user);
       setOnline(data.online || []);
       await loadChats();
       renderShell();
@@ -154,18 +172,36 @@
     } catch (error) {
       console.warn(error);
       localStorage.removeItem('pulselink_token');
+      localStorage.removeItem('pulselink_selected_chat');
       state.token = '';
       renderAuth();
     }
+  }
+
+  function authFieldsHtml(mode) {
+    if (mode === 'login') {
+      return `
+        <label class="field"><span>@username или почта</span><input class="input" name="login" autocomplete="username" placeholder="@coffin" data-username-input data-allow-email="true" required></label>
+        <label class="field"><span>Пароль</span><input class="input" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required></label>
+        <div class="hint">Для первого запуска создан главный администратор <b>@coffin</b>. Пароль по умолчанию: <b>PulseLink2026!</b> (изменяется переменной PULSELINK_ADMIN_PASSWORD).</div>
+      `;
+    }
+    return `
+      <label class="field"><span>Username</span><input class="input" name="username" autocomplete="username" placeholder="@pulse" pattern="^@?[a-zA-Z0-9_]{3,24}$" data-username-input required></label>
+      <label class="field"><span>Nickname</span><input class="input" name="nickname" autocomplete="name" placeholder="Ваше имя" maxlength="48" required></label>
+      <label class="field"><span>Почта (обязательно)</span><input class="input" name="email" type="email" autocomplete="email" placeholder="you@example.com" required></label>
+      <label class="field"><span>Пароль</span><input class="input" name="password" type="password" autocomplete="new-password" minlength="6" placeholder="минимум 6 символов" required></label>
+    `;
   }
 
   function renderAuth() {
     disconnectSse();
     stopPolling();
     document.body.classList.remove('compact');
-    app.className = '';
+    applySettings();
+    app.className = `auth-shell auth-mode-${state.authMode}`;
     app.innerHTML = `
-      <main class="auth-page">
+      <main class="auth-page auth-mode-${state.authMode}">
         <section class="auth-hero">
           <div>
             <div class="brand-lockup">
@@ -185,44 +221,70 @@
             <div class="feature-pill">Админ-панель @coffin 🛡</div>
           </div>
         </section>
-        <section class="auth-card">
-          <div class="auth-tabs">
-            <button data-auth-tab="login" class="${state.authMode === 'login' ? 'active' : ''}">Вход</button>
-            <button data-auth-tab="register" class="${state.authMode === 'register' ? 'active' : ''}">Регистрация</button>
+        <section class="auth-card auth-mode-${state.authMode}">
+          <div class="auth-tabs auth-mode-${state.authMode}" role="tablist" aria-label="Режим авторизации">
+            <button type="button" data-auth-tab="login" class="${state.authMode === 'login' ? 'active' : ''}" aria-selected="${state.authMode === 'login'}">Вход</button>
+            <button type="button" data-auth-tab="register" class="${state.authMode === 'register' ? 'active' : ''}" aria-selected="${state.authMode === 'register'}">Регистрация</button>
           </div>
           <form id="auth-form" class="form-stack">
-            ${state.authMode === 'login' ? `
-              <label class="field"><span>@username или почта</span><input class="input" name="login" autocomplete="username" placeholder="@coffin" data-username-input data-allow-email="true" required></label>
-              <label class="field"><span>Пароль</span><input class="input" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required></label>
-              <div class="hint">Для первого запуска создан главный администратор <b>@coffin</b>. Пароль по умолчанию: <b>PulseLink2026!</b> (изменяется переменной PULSELINK_ADMIN_PASSWORD).</div>
-            ` : `
-              <label class="field"><span>Username</span><input class="input" name="username" autocomplete="username" placeholder="@pulse" pattern="^@?[a-zA-Z0-9_]{3,24}$" data-username-input required></label>
-              <label class="field"><span>Nickname</span><input class="input" name="nickname" autocomplete="name" placeholder="Ваше имя" maxlength="48" required></label>
-              <label class="field"><span>Почта (обязательно)</span><input class="input" name="email" type="email" autocomplete="email" placeholder="you@example.com" required></label>
-              <label class="field"><span>Пароль</span><input class="input" name="password" type="password" autocomplete="new-password" minlength="6" placeholder="минимум 6 символов" required></label>
-            `}
+            <div id="auth-fields" class="auth-fields">${authFieldsHtml(state.authMode)}</div>
             <div id="auth-error" class="error-text"></div>
-            <button class="primary-btn full" type="submit">${state.authMode === 'login' ? 'Войти' : 'Создать аккаунт'}</button>
+            <button id="authSubmit" class="primary-btn full" type="submit">${state.authMode === 'login' ? 'Войти' : 'Создать аккаунт'}</button>
           </form>
         </section>
       </main>
     `;
-    $$('[data-auth-tab]').forEach((button) => {
-      button.addEventListener('click', () => {
-        if (state.authMode === button.dataset.authTab) return;
-        const card = $('.auth-card');
-        button.classList.add('is-pressing');
-        card?.classList.add('switching');
-        setTimeout(() => {
-          state.authMode = button.dataset.authTab;
-          renderAuth();
-        }, 170);
-      });
-    });
-    $$('[data-username-input]').forEach((input) => wireUsernameAutoprefix(input, { allowEmail: input.dataset.allowEmail === 'true' }));
-    $('#auth-form').addEventListener('submit', handleAuthSubmit);
+    wireAuthControls();
   }
 
+  function wireAuthControls(root = document) {
+    $$('[data-auth-tab]', root).forEach((button) => {
+      button.addEventListener('click', () => switchAuthMode(button.dataset.authTab));
+    });
+    $$('[data-username-input]', root).forEach((input) => wireUsernameAutoprefix(input, { allowEmail: input.dataset.allowEmail === 'true' }));
+    $('#auth-form', root)?.addEventListener('submit', handleAuthSubmit);
+  }
+
+  function setAuthModeClasses(mode) {
+    app.classList.toggle('auth-mode-login', mode === 'login');
+    app.classList.toggle('auth-mode-register', mode === 'register');
+    $('.auth-page')?.classList.toggle('auth-mode-login', mode === 'login');
+    $('.auth-page')?.classList.toggle('auth-mode-register', mode === 'register');
+    $('.auth-card')?.classList.toggle('auth-mode-login', mode === 'login');
+    $('.auth-card')?.classList.toggle('auth-mode-register', mode === 'register');
+    $('.auth-tabs')?.classList.toggle('auth-mode-login', mode === 'login');
+    $('.auth-tabs')?.classList.toggle('auth-mode-register', mode === 'register');
+    $$('[data-auth-tab]').forEach((button) => {
+      const active = button.dataset.authTab === mode;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-selected', String(active));
+    });
+  }
+
+  function switchAuthMode(mode) {
+    if (!['login', 'register'].includes(mode) || state.authMode === mode) return;
+    state.authMode = mode;
+    setAuthModeClasses(mode);
+    const fields = $('#auth-fields');
+    const submit = $('#authSubmit');
+    const errorBox = $('#auth-error');
+    if (!fields || !submit) return;
+    errorBox.textContent = '';
+    fields.style.minHeight = `${fields.offsetHeight}px`;
+    fields.classList.add('is-switching');
+    window.setTimeout(() => {
+      fields.innerHTML = authFieldsHtml(mode);
+      $$('[data-username-input]', fields).forEach((input) => wireUsernameAutoprefix(input, { allowEmail: input.dataset.allowEmail === 'true' }));
+      submit.textContent = mode === 'login' ? 'Войти' : 'Создать аккаунт';
+      fields.classList.remove('is-switching');
+      fields.classList.add('is-entering');
+      fields.style.minHeight = `${fields.scrollHeight}px`;
+      window.setTimeout(() => {
+        fields.classList.remove('is-entering');
+        fields.style.minHeight = '';
+      }, 230);
+    }, 105);
+  }
 
   function looksLikeEmail(value) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
@@ -279,6 +341,7 @@
       state.token = data.token;
       state.me = data.user;
       localStorage.setItem('pulselink_token', state.token);
+      resetUserScopedState(data.user);
       await loadChats();
       renderShell();
       connectSse();
@@ -299,7 +362,7 @@
       const saved = state.chats.find((chat) => chat.type === 'saved');
       state.selectedChatId = saved?.id || state.chats[0]?.id || '';
     }
-    if (state.selectedChatId) localStorage.setItem('pulselink_selected_chat', state.selectedChatId);
+    if (state.selectedChatId) rememberSelectedChat(state.selectedChatId);
   }
 
   async function loadMessages(chatId, silent = false) {
@@ -357,13 +420,8 @@
   function applySettings() {
     const s = settings();
     document.body.classList.toggle('compact', Boolean(s.compactMode));
-    const pane = $('#chatPane');
-    if (pane) {
-      pane.classList.toggle('bg-midnight', s.chatBackground === 'midnight');
-      pane.classList.toggle('bg-paper', s.chatBackground === 'paper');
-      pane.classList.toggle('bg-custom', s.chatBackground === 'custom');
-      if (s.customBackground) pane.style.setProperty('--custom-chat-bg', s.customBackground);
-    }
+    const scale = Math.max(0.85, Math.min(1.2, Number(s.uiScale) || 1));
+    document.documentElement.style.setProperty('--ui-scale', scale.toFixed(2));
   }
 
   function renderSidebar() {
@@ -459,7 +517,7 @@
 
   async function selectChat(chatId) {
     state.selectedChatId = chatId;
-    localStorage.setItem('pulselink_selected_chat', chatId);
+    rememberSelectedChat(chatId);
     renderChat();
     renderDetails();
     if (!state.messages.has(chatId)) await loadMessages(chatId);
@@ -1151,8 +1209,7 @@
           <label class="check-row"><input type="checkbox" name="compactMode" ${s.compactMode ? 'checked' : ''}><span>Компактный режим</span></label>
           <label class="field"><span>Отправка</span><select class="select" name="sendMode"><option value="enter" ${s.sendMode === 'enter' ? 'selected' : ''}>Enter</option><option value="ctrlEnter" ${s.sendMode === 'ctrlEnter' ? 'selected' : ''}>Ctrl+Enter</option></select></label>
         </div>
-        <label class="field"><span>Фон области чата</span><select class="select" name="chatBackground"><option value="gradient" ${s.chatBackground === 'gradient' ? 'selected' : ''}>Pulse gradient</option><option value="midnight" ${s.chatBackground === 'midnight' ? 'selected' : ''}>Midnight</option><option value="paper" ${s.chatBackground === 'paper' ? 'selected' : ''}>Slate paper</option><option value="custom" ${s.chatBackground === 'custom' ? 'selected' : ''}>Custom CSS color</option></select></label>
-        <label class="field"><span>Custom background</span><input class="input" name="customBackground" value="${escapeHtml(s.customBackground || '#111827')}" placeholder="#111827 или linear-gradient(...) "></label>
+        <label class="field scale-field"><span>Масштаб интерфейса: <b id="uiScaleValue">${Math.round((Number(s.uiScale) || 1) * 100)}%</b></span><input class="range-input" name="uiScale" type="range" min="85" max="120" step="5" value="${Math.round((Number(s.uiScale) || 1) * 100)}"></label>
         <button class="primary-btn" type="submit">Сохранить</button>
       </form>
     `);
@@ -1162,6 +1219,11 @@
       avatar = await compressImage(file);
       $('#profileAvatarWrap', body).innerHTML = `<img class="avatar large" src="${avatar}" alt="">`;
     });
+    $('[name="uiScale"]', body)?.addEventListener('input', (event) => {
+      const value = Number(event.target.value || 100);
+      $('#uiScaleValue', body).textContent = `${value}%`;
+      document.documentElement.style.setProperty('--ui-scale', (value / 100).toFixed(2));
+    });
     $('#settingsForm', body).addEventListener('submit', async (event) => {
       event.preventDefault();
       const form = Object.fromEntries(new FormData(event.currentTarget).entries());
@@ -1170,8 +1232,7 @@
         notifications: Boolean(form.notifications),
         compactMode: Boolean(form.compactMode),
         sendMode: form.sendMode,
-        chatBackground: form.chatBackground,
-        customBackground: form.customBackground
+        uiScale: Math.max(0.85, Math.min(1.2, Number(form.uiScale || 100) / 100))
       };
       if (nextSettings.notifications && window.Notification?.permission === 'default') {
         try { await window.Notification.requestPermission(); } catch (_error) { /* noop */ }
@@ -1633,10 +1694,10 @@
     disconnectSse();
     stopPolling();
     localStorage.removeItem('pulselink_token');
+    localStorage.removeItem('pulselink_selected_chat');
     state.token = '';
     state.me = null;
-    state.chats = [];
-    state.messages.clear();
+    resetUserScopedState(null);
     state.lastRenderedShell = false;
     renderAuth();
   }

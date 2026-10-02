@@ -38,8 +38,13 @@ function defaultSettings() {
     notifications: false,
     sendMode: 'enter',
     compactMode: false,
-    chatBackground: 'gradient'
+    uiScale: 1
   };
+}
+
+function dropLegacyAppearanceSettings(settings) {
+  for (const key of ['chat' + 'Background', 'custom' + 'Background']) delete settings[key];
+  return settings;
 }
 
 function defaultDb() {
@@ -89,7 +94,9 @@ function migrateDb() {
     user.banned = Boolean(user.banned);
     user.createdAt = user.createdAt || now();
     user.lastSeen = user.lastSeen || now();
-    user.settings = { ...defaultSettings(), ...(user.settings || {}) };
+    user.settings = dropLegacyAppearanceSettings({ ...defaultSettings(), ...(user.settings || {}) });
+    if (!Number.isFinite(Number(user.settings.uiScale))) user.settings.uiScale = 1;
+    user.settings.uiScale = Math.max(0.85, Math.min(1.2, Number(user.settings.uiScale)));
     if (!user.password || !user.password.hash || !user.password.salt) {
       user.password = hashPassword(crypto.randomBytes(12).toString('hex'));
     }
@@ -185,7 +192,51 @@ function ensureSuperAdmin() {
 }
 
 function ensureSavedChats() {
-  for (const user of db.users) ensureSavedChat(user.id);
+  const validUserIds = new Set(db.users.map((user) => user.id));
+  const savedByOwner = new Map();
+  const removeChatIds = new Set();
+
+  for (const chat of db.chats) {
+    if (chat.type !== 'saved') continue;
+    if (!chat.ownerId || !validUserIds.has(chat.ownerId)) {
+      removeChatIds.add(chat.id);
+      continue;
+    }
+    if (!savedByOwner.has(chat.ownerId)) savedByOwner.set(chat.ownerId, []);
+    savedByOwner.get(chat.ownerId).push(chat);
+  }
+
+  for (const user of db.users) {
+    const list = (savedByOwner.get(user.id) || [])
+      .sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+
+    if (!list.length) {
+      ensureSavedChat(user.id);
+      continue;
+    }
+
+    const primary = list[0];
+    primary.type = 'saved';
+    primary.title = 'Избранное';
+    primary.description = 'Ваши личные заметки и голосовые сообщения';
+    primary.public = false;
+    primary.ownerId = user.id;
+    primary.admins = [];
+    primary.participants = [user.id];
+    primary.voiceChannels = [];
+    primary.updatedAt = primary.updatedAt || primary.createdAt || now();
+
+    for (const duplicate of list.slice(1)) {
+      for (const message of db.messages) {
+        if (message.chatId === duplicate.id) message.chatId = primary.id;
+      }
+      removeChatIds.add(duplicate.id);
+    }
+  }
+
+  if (removeChatIds.size) {
+    db.chats = db.chats.filter((chat) => !removeChatIds.has(chat.id));
+  }
 }
 
 function findUserById(id) {
@@ -233,6 +284,8 @@ function isChatOwner(chat, user) {
 
 function canSeeChat(chat, user) {
   if (!chat || !user) return false;
+  if (chat.type === 'saved') return chat.ownerId === user.id;
+  if (chat.type === 'direct') return (chat.participants || []).includes(user.id);
   return (chat.participants || []).includes(user.id) || isSuperAdmin(user);
 }
 
@@ -724,8 +777,10 @@ async function handleApi(req, res, parsedUrl) {
         if (typeof incoming.notifications === 'boolean') user.settings.notifications = incoming.notifications;
         if (incoming.sendMode === 'enter' || incoming.sendMode === 'ctrlEnter') user.settings.sendMode = incoming.sendMode;
         if (typeof incoming.compactMode === 'boolean') user.settings.compactMode = incoming.compactMode;
-        if (['gradient', 'midnight', 'paper', 'custom'].includes(incoming.chatBackground)) user.settings.chatBackground = incoming.chatBackground;
-        if (typeof incoming.customBackground === 'string' && incoming.customBackground.length < 512) user.settings.customBackground = incoming.customBackground;
+        if (Number.isFinite(Number(incoming.uiScale))) {
+          user.settings.uiScale = Math.max(0.85, Math.min(1.2, Number(incoming.uiScale)));
+        }
+        dropLegacyAppearanceSettings(user.settings);
       }
       user.lastSeen = now();
       writeDb();

@@ -395,9 +395,6 @@ a { color: inherit; }
   grid-template-rows: auto minmax(0, 1fr) auto;
   background: var(--chat-bg, radial-gradient(circle at 50% 0%, rgba(124,58,237,0.13), transparent 36%), rgba(7,10,18,0.36));
 }
-.chat-pane.bg-midnight { --chat-bg: linear-gradient(135deg, #050816, #0a1020 48%, #020617); }
-.chat-pane.bg-paper { --chat-bg: linear-gradient(135deg, #172033, #111827); }
-.chat-pane.bg-custom { --chat-bg: var(--custom-chat-bg, #111827); }
 .chat-header {
   min-height: 76px;
   padding: 14px 20px;
@@ -1048,9 +1045,6 @@ body::after {
   background-size: 34px 34px, 100% 100%;
   opacity: .9;
 }
-.chat-pane.bg-midnight { --chat-bg: radial-gradient(circle at 50% -10%, rgba(79, 70, 229, 0.20), transparent 42%), linear-gradient(135deg, #030712, #08111f 58%, #020617); }
-.chat-pane.bg-paper { --chat-bg: radial-gradient(circle at 50% 0%, rgba(148, 163, 184, 0.16), transparent 36%), linear-gradient(135deg, #1b2740, #101827); }
-.chat-pane.bg-custom { --chat-bg: var(--custom-chat-bg, #111827); }
 .chat-header,
 .messages,
 .composer { position: relative; z-index: 1; }
@@ -1403,4 +1397,178 @@ tr:hover td { background: rgba(255,255,255,0.03); }
 .voice-channel:hover {
   border-color: rgba(148,163,184,.20);
   box-shadow: 0 18px 44px rgba(2,6,23,.20), inset 0 1px 0 rgba(255,255,255,.06);
+}
+
+/* Единая Purple Theme, плавная авторизация и масштаб интерфейса. */
+:root {
+  --bg: #090512;
+  --bg-soft: #130a24;
+  --panel: rgba(24, 14, 42, 0.82);
+  --panel-solid: #171026;
+  --panel-2: rgba(35, 20, 62, 0.86);
+  --card: rgba(168, 85, 247, 0.10);
+  --card-strong: rgba(216, 180, 254, 0.16);
+  --line: rgba(216, 180, 254, 0.18);
+  --line-strong: rgba(233, 213, 255, 0.28);
+  --text: #fbf7ff;
+  --muted: #c9b8df;
+  --muted-2: #9782b5;
+  --brand: #8b5cf6;
+  --brand-2: #c084fc;
+  --brand-3: #a78bfa;
+  --danger: #fb7185;
+  --warning: #fbbf24;
+  --shadow: 0 28px 90px rgba(24, 6, 45, 0.52);
+  --shadow-soft: 0 20px 60px rgba(25, 9, 44, 0.34);
+  --ui-scale: 1;
+}
+
+body {
+  background:
+    radial-gradient(circle at 10% 4%, rgba(168, 85, 247, 0.38), transparent 31%),
+    radial-gradient(circle at 86% 0%, rgba(124, 58, 237, 0.30), transparent 29%),
+    radial-gradient(circle at 52% 112%, rgba(192, 132, 252, 0.17), transparent 34%),
+    linear-gradient(135deg, #090512 0%, #120920 44%, #1a102b 100%);
+}
+
+#app.app-shell {
+  transform: scale(var(--ui-scale));
+  transform-origin: top left;
+  width: calc(100vw / var(--ui-scale));
+  height: calc(100dvh / var(--ui-scale));
+}
+#app.auth-shell {
+  width: calc(100vw / var(--ui-scale));
+  min-height: calc(100vh / var(--ui-scale));
+  transform: scale(var(--ui-scale));
+  transform-origin: top left;
+}
+#app.auth-shell .auth-page {
+  min-height: calc(100vh / var(--ui-scale));
+}
+
+.primary-btn,
+.auth-tabs::before {
+  background:
+    radial-gradient(circle at 24% 0%, rgba(255,255,255,.34), transparent 34%),
+    linear-gradient(135deg, #7c3aed 0%, #a855f7 48%, #d946ef 100%);
+}
+.logo-mark,
+.avatar-fallback {
+  background:
+    radial-gradient(circle at 30% 18%, rgba(255,255,255,.42), transparent 26%),
+    linear-gradient(135deg, #7c3aed 0%, #a855f7 45%, #d946ef 100%);
+  box-shadow: 0 18px 48px rgba(168, 85, 247, 0.34), inset 0 1px 0 rgba(255,255,255,0.26);
+}
+
+.auth-card {
+  transition: box-shadow .25s ease, border-color .25s ease, transform .25s ease;
+}
+.auth-card.switching {
+  animation: none;
+}
+.auth-tabs {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid rgba(216, 180, 254, 0.16);
+  background: rgba(31, 17, 52, 0.62);
+}
+.auth-tabs::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: 6px;
+  bottom: 6px;
+  left: 6px;
+  width: calc((100% - 20px) / 2);
+  border-radius: 14px;
+  box-shadow: 0 16px 34px rgba(168, 85, 247, 0.26), inset 0 1px 0 rgba(255,255,255,.22);
+  transform: translateX(0);
+  transition: transform .32s cubic-bezier(.2,.9,.2,1), width .32s ease;
+}
+.auth-tabs.auth-mode-register::before {
+  transform: translateX(calc(100% + 8px));
+}
+.auth-tabs button,
+.auth-tabs button.active,
+.segmented button.active {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  box-shadow: none;
+}
+.auth-tabs button {
+  color: rgba(251, 247, 255, .72);
+}
+.auth-tabs button.active {
+  color: #fff;
+}
+.auth-fields {
+  display: grid;
+  gap: 14px;
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+  transition: opacity .15s ease, transform .15s ease, filter .15s ease, min-height .22s ease;
+  will-change: opacity, transform, filter;
+}
+.auth-fields.is-switching {
+  opacity: 0;
+  transform: translateY(6px) scale(.99);
+  filter: blur(4px);
+}
+.auth-fields.is-entering {
+  animation: authFieldsIn .22s cubic-bezier(.2,.8,.2,1) both;
+}
+@keyframes authFieldsIn {
+  from { opacity: 0; transform: translateY(-4px) scale(.992); filter: blur(4px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+.input,
+.textarea,
+.select {
+  background: rgba(20, 10, 34, 0.48);
+  border-color: rgba(216, 180, 254, 0.18);
+}
+.input:focus,
+.textarea:focus,
+.select:focus {
+  border-color: rgba(192, 132, 252, 0.72);
+  box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.16);
+}
+.chat-pane {
+  --chat-bg:
+    radial-gradient(circle at 50% -10%, rgba(168,85,247,0.20), transparent 42%),
+    radial-gradient(circle at 100% 12%, rgba(124,58,237,0.12), transparent 30%),
+    linear-gradient(135deg, rgba(13, 8, 24, 0.96), rgba(24, 14, 42, 0.92));
+}
+.chat-pane::before {
+  background-image:
+    radial-gradient(circle at 24px 24px, rgba(216, 180, 254, 0.055) 1px, transparent 1.2px),
+    linear-gradient(135deg, rgba(216, 180, 254, 0.045), transparent 28%, rgba(168, 85, 247, 0.045));
+}
+.message-row.own .message-bubble {
+  background:
+    radial-gradient(circle at 16% 0%, rgba(255,255,255,.20), transparent 30%),
+    linear-gradient(135deg, rgba(124,58,237,0.92), rgba(147,51,234,0.70) 55%, rgba(192,132,252,0.46));
+}
+.header-actions .round-btn.active {
+  border-color: rgba(192,132,252,.55);
+  background: linear-gradient(135deg, rgba(124,58,237,.34), rgba(192,132,252,.20));
+  box-shadow: 0 14px 35px rgba(168,85,247,.15), inset 0 1px 0 rgba(255,255,255,.14);
+}
+.range-input {
+  width: 100%;
+  accent-color: #a855f7;
+}
+.scale-field b {
+  color: #e9d5ff;
+}
+.panel-card:hover,
+.voice-channel:hover,
+.discover-card:hover,
+.member-row:hover {
+  transform: translateY(-1px);
 }

@@ -1,47 +1,47 @@
 # PulseLink
 
-PulseLink — dependency-free Node.js prototype of a modern messenger.
+PulseLink — прототип современного мессенджера на Node.js без внешних зависимостей.
 
-## Implemented
+## Реализовано
 
-- Registration by unique `@username`, nickname, mandatory email and password stored as a Node `crypto.scrypt` hash.
-- Personal chats, saved messages (`Избранное`), groups and admin-only publishing channels.
-- Message read statuses `✓✓`, online presence and instant updates over Server-Sent Events with polling fallback.
-- Voice messages: microphone recording, automatic waveform generation and a built-in seekable waveform player.
-- Discord-like group voice channels: browser `AudioWorklet` captures PCM frames, a custom RFC 6455 WebSocket relay in `server.js` broadcasts audio through the server, plus mute/listener modes and active-speaker highlighting.
-- Public community discovery and one-click join.
-- Avatars for users/groups/channels: client-side square crop/compression and dataURL storage.
-- Settings: message sound, system notifications, Enter/Ctrl+Enter sending, compact mode and chat background.
-- Member management: add/remove, owner/admin roles and ownership transfer on leave.
-- Admin panel for `@coffin`: stats, ban/unban, global role grants, chat deletion and announcements to `PulseLink News`.
-- Responsive layout for mobile and desktop.
+- Регистрация по уникальному `@username`, nickname, обязательной почте и паролю, который хранится как хеш Node `crypto.scrypt`.
+- Личные чаты, сохранённые сообщения (`Избранное`), группы и каналы, где публиковать могут только администраторы.
+- Статусы прочтения сообщений `✓✓`, онлайн-присутствие и мгновенные обновления через Server-Sent Events с резервным опросом.
+- Голосовые сообщения: запись с микрофона, автоматическое построение волновой формы и встроенный плеер с перемоткой по клику на волну.
+- Голосовые каналы в группах в стиле Discord: браузерный `AudioWorklet` захватывает PCM-кадры, собственный WebSocket-релей RFC 6455 в `server.js` передаёт звук через сервер, доступны мьют, режим слушателя и подсветка активного говорящего.
+- Обзор публичных сообществ и вступление в один клик.
+- Аватары пользователей, групп и каналов: клиентская квадратная обрезка, сжатие и хранение в формате dataURL.
+- Настройки: звук сообщений, системные уведомления, отправка по Enter/Ctrl+Enter, компактный режим и масштаб интерфейса.
+- Управление участниками: добавление и удаление, роли владельца/администратора и передача владения при выходе.
+- Админ-панель для `@coffin`: статистика, бан/разбан, выдача глобальных прав, удаление чатов и объявления в `PulseLink News`.
+- Адаптивная вёрстка для телефонов и десктопов.
 
-## Run
+## Запуск
 
 ```bash
 npm start
-# or
+# или
 HOST=0.0.0.0 PORT=3000 npm run dev
 ```
 
-Open `http://localhost:3000`.
+Откройте `http://localhost:3000`.
 
-On first start the server seeds the super-admin account:
+При первом запуске сервер создаёт аккаунт главного администратора:
 
 - username: `@coffin`
 - password: `PulseLink2026!`
 
-Override the default password with `PULSELINK_ADMIN_PASSWORD` before first start.
+Чтобы изменить пароль по умолчанию до первого запуска, задайте переменную окружения `PULSELINK_ADMIN_PASSWORD`.
 
-Runtime data is stored in `data/db.json` and is ignored by Git.
+Рабочие данные сохраняются в `data/db.json`; этот файл игнорируется Git.
 
-## Scripts
+## Скрипты
 
 ```bash
-npm test        # Node test runner / syntax smoke
+npm test        # тестовый раннер Node / smoke-проверка синтаксиса и API
 node --check server.js
 ```
 
-## Notes
+## Примечания
 
-The voice-channel relay intentionally uses only Node built-ins: it performs the WebSocket handshake and frame parsing/writing directly without external dependencies.
+Релей голосовых каналов намеренно использует только встроенные возможности Node.js: WebSocket-handshake, разбор и отправка фреймов реализованы напрямую, без внешних зависимостей.

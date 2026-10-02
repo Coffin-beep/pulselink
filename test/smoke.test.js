@@ -61,7 +61,20 @@ test('PulseLink API smoke flow', async () => {
     assert.ok(alice.token);
 
     const chats = await json(await fetch(`${baseUrl}/api/chats`, { headers: { authorization: `Bearer ${alice.token}` } }));
-    assert.ok(chats.chats.some((chat) => chat.type === 'saved'));
+    const aliceSaved = chats.chats.filter((chat) => chat.type === 'saved');
+    assert.equal(aliceSaved.length, 1);
+    assert.equal(aliceSaved[0].ownerId, alice.user.id);
+
+    const bob = await json(await fetch(`${baseUrl}/api/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username: '@bob', nickname: 'Bob', email: 'bob@example.com', password: 'secret1' })
+    }));
+    const bobChats = await json(await fetch(`${baseUrl}/api/chats`, { headers: { authorization: `Bearer ${bob.token}` } }));
+    const bobSaved = bobChats.chats.filter((chat) => chat.type === 'saved');
+    assert.equal(bobSaved.length, 1);
+    assert.equal(bobSaved[0].ownerId, bob.user.id);
+    assert.notEqual(bobSaved[0].id, aliceSaved[0].id);
 
     const group = await json(await fetch(`${baseUrl}/api/chats`, {
       method: 'POST',
@@ -83,8 +96,14 @@ test('PulseLink API smoke flow', async () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ login: '@coffin', password: 'test-admin-pass' })
     }));
+    const adminChats = await json(await fetch(`${baseUrl}/api/chats`, { headers: { authorization: `Bearer ${admin.token}` } }));
+    const adminSaved = adminChats.chats.filter((chat) => chat.type === 'saved');
+    assert.equal(adminSaved.length, 1);
+    assert.equal(adminSaved[0].ownerId, admin.user.id);
+    assert.ok(!adminChats.chats.some((chat) => chat.id === aliceSaved[0].id || chat.id === bobSaved[0].id));
+
     const stats = await json(await fetch(`${baseUrl}/api/admin/stats`, { headers: { authorization: `Bearer ${admin.token}` } }));
-    assert.ok(stats.stats.users >= 2);
+    assert.ok(stats.stats.users >= 3);
     assert.ok(stats.stats.messages >= 1);
   } finally {
     child.kill('SIGTERM');
