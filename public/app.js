@@ -139,6 +139,30 @@
     `;
   }
 
+
+  const ICONS = {
+    message: '<path d="M5 7.8C5 6.25 6.25 5 7.8 5h8.4C17.75 5 19 6.25 19 7.8v5.4c0 1.55-1.25 2.8-2.8 2.8h-5.6L6.4 19v-3H7.8C6.25 16 5 14.75 5 13.2V7.8Z"/>',
+    users: '<path d="M8.5 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M15.5 10a2.5 2.5 0 1 0 0-5"/><path d="M3.5 19a5 5 0 0 1 10 0"/><path d="M14.5 14.5A4.5 4.5 0 0 1 20.5 19"/>',
+    channel: '<path d="M5 14.5h3l7 4.5V5L8 9.5H5a2 2 0 0 0-2 2v1a2 2 0 0 0 2 2Z"/><path d="M18 9a4.5 4.5 0 0 1 0 6"/>',
+    bookmark: '<path d="M7 5.8C7 4.8 7.8 4 8.8 4h6.4c1 0 1.8.8 1.8 1.8V20l-5-3.2L7 20V5.8Z"/>',
+    search: '<circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4 4"/>',
+    settings: '<path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Z"/><path d="M19.4 13.5a7.8 7.8 0 0 0 0-3l2-1.5-2-3.4-2.4 1a8.2 8.2 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.6A8.2 8.2 0 0 0 7 6.6l-2.4-1-2 3.4 2 1.5a7.8 7.8 0 0 0 0 3l-2 1.5 2 3.4 2.4-1a8.2 8.2 0 0 0 2.6 1.5l.4 2.6h4l.4-2.6a8.2 8.2 0 0 0 2.6-1.5l2.4 1 2-3.4-2-1.5Z"/>',
+    shield: '<path d="M12 3.5 19 6v5.3c0 4.4-2.8 7.7-7 9.2-4.2-1.5-7-4.8-7-9.2V6l7-2.5Z"/><path d="m9.5 12 1.7 1.7 3.7-4"/>',
+    mic: '<path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/>',
+    micOff: '<path d="m4 4 16 16"/><path d="M9 9v2a3 3 0 0 0 4.6 2.55"/><path d="M15 10.2V6a3 3 0 0 0-5.1-2.15"/><path d="M5 11a7 7 0 0 0 10.8 5.9"/><path d="M19 11a7 7 0 0 1-1.1 3.75"/><path d="M12 18v3"/>',
+    headphones: '<path d="M4 13a8 8 0 0 1 16 0"/><path d="M4 13v3a3 3 0 0 0 3 3h1v-7H7a3 3 0 0 0-3 3Z"/><path d="M20 13v3a3 3 0 0 1-3 3h-1v-7h1a3 3 0 0 1 3 3Z"/>',
+    volume: '<path d="M5 14.5h3l5 3.5V6L8 9.5H5a2 2 0 0 0-2 2v1a2 2 0 0 0 2 2Z"/><path d="M16 9.5a4 4 0 0 1 0 5"/><path d="M18.5 7a7.5 7.5 0 0 1 0 10"/>',
+    menu: '<path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/>',
+    info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5"/><path d="M12 8h.01"/>',
+    close: '<path d="M6 6l12 12"/><path d="M18 6 6 18"/>',
+    logout: '<path d="M10 5H6.8C5.8 5 5 5.8 5 6.8v10.4c0 1 .8 1.8 1.8 1.8H10"/><path d="M14 8l4 4-4 4"/><path d="M18 12H9"/>'
+  };
+
+  function iconHtml(name, extra = '') {
+    const body = ICONS[name] || ICONS.info;
+    return `<svg class="ui-icon ${extra}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${body}</svg>`;
+  }
+
   function avatarHtml(entity, size = '', fallback = 'P') {
     const cls = ['avatar', size].filter(Boolean).join(' ');
     if (entity?.avatar) return `<img class="${cls}" src="${entity.avatar}" alt="">`;
@@ -147,8 +171,8 @@
 
   function chatIconHtml(chat) {
     if (chat.avatar) return `<span class="chat-icon"><img src="${chat.avatar}" alt=""></span>`;
-    const icon = chat.type === 'saved' ? '🔖' : chat.type === 'direct' ? '💬' : chat.type === 'channel' ? '📣' : '👥';
-    return `<span class="chat-icon">${icon}</span>`;
+    const icon = chat.type === 'saved' ? 'bookmark' : chat.type === 'direct' ? 'message' : chat.type === 'channel' ? 'channel' : 'users';
+    return `<span class="chat-icon">${iconHtml(icon)}</span>`;
   }
 
   function typeLabel(chat) {
@@ -218,7 +242,7 @@
             <div class="feature-pill">@username + обязательная почта</div>
             <div class="feature-pill">scrypt-хеш пароля</div>
             <div class="feature-pill">Группы, каналы и обзор</div>
-            <div class="feature-pill">Админ-панель @coffin 🛡</div>
+            <div class="feature-pill">${iconHtml('shield')} Админ-панель @coffin</div>
           </div>
         </section>
         <section class="auth-card auth-mode-${state.authMode}">
@@ -441,19 +465,11 @@
             <div class="brand-subtitle">живой мессенджер</div>
           </div>
         </div>
-        <div class="me-card">
-          ${avatarHtml(state.me)}
-          <div class="me-meta">
-            <div class="me-name">${escapeHtml(state.me.nickname)}</div>
-            <div class="me-username">${escapeHtml(state.me.username)} · ${state.me.role === 'superadmin' ? 'главный админ' : state.me.role === 'admin' ? 'админ' : 'online'}</div>
-          </div>
-          <span class="online-dot on" title="online"></span>
-        </div>
         <div class="quick-actions">
-          <button class="round-btn" data-action="new-dm" title="Личный чат">💬</button>
-          <button class="round-btn" data-action="new-group" title="Создать группу">👥</button>
-          <button class="round-btn" data-action="new-channel" title="Создать канал">📣</button>
-          <button class="round-btn" data-action="discover" title="Обзор">🔎</button>
+          <button class="round-btn" data-action="new-dm" title="Личный чат" aria-label="Личный чат">${iconHtml('message')}</button>
+          <button class="round-btn" data-action="new-group" title="Создать группу" aria-label="Создать группу">${iconHtml('users')}</button>
+          <button class="round-btn" data-action="new-channel" title="Создать канал" aria-label="Создать канал">${iconHtml('channel')}</button>
+          <button class="round-btn" data-action="discover" title="Обзор" aria-label="Обзор">${iconHtml('search')}</button>
         </div>
         <div class="search-box"><input id="chatSearch" class="input" placeholder="Поиск чатов" value="${escapeHtml(state.search)}"></div>
       </div>
@@ -461,10 +477,19 @@
         ${chats.map((chat) => chatListItem(chat)).join('') || '<div class="empty-state"><p>Чаты не найдены</p></div>'}
       </div>
       <div class="sidebar-footer">
-        <div class="button-row">
-          <button class="ghost-btn" data-action="settings">⚙️ Настройки</button>
-          ${isGlobalAdmin() ? '<button class="ghost-btn" data-action="admin">🛡 Админ</button>' : ''}
-          <button class="ghost-btn" data-action="logout">Выйти</button>
+        <div class="sidebar-profile">
+          <button class="me-card profile-card" data-action="settings" title="Профиль и настройки">
+            ${avatarHtml(state.me)}
+            <span class="me-meta">
+              <span class="me-name">${escapeHtml(state.me.nickname)}</span>
+              <span class="me-username">${escapeHtml(state.me.username)} · ${state.me.role === 'superadmin' ? 'главный админ' : state.me.role === 'admin' ? 'админ' : 'online'}</span>
+            </span>
+            <span class="online-dot on" title="online"></span>
+          </button>
+          <div class="profile-actions">
+            <button class="round-btn settings-btn" data-action="settings" title="Настройки" aria-label="Настройки">${iconHtml('settings')}</button>
+            ${isGlobalAdmin() ? `<button class="round-btn" data-action="admin" title="Админ-панель" aria-label="Админ-панель">${iconHtml('shield')}</button>` : ''}
+          </div>
         </div>
       </div>
     `;
@@ -485,7 +510,7 @@
   function chatListItem(chat) {
     const last = chat.lastMessage;
     let lastText = chat.description || 'Нет сообщений';
-    if (last) lastText = last.kind === 'voice' ? '🎙 Голосовое сообщение' : last.text;
+    if (last) lastText = last.kind === 'voice' ? 'Голосовое сообщение' : last.text;
     const voiceCount = (chat.voiceStates || []).reduce((sum, room) => sum + (room.users?.length || 0), 0);
     const lastTime = last?.createdAt ? formatTime(last.createdAt) : '';
     return `
@@ -498,7 +523,7 @@
         <span class="chat-badges">
           ${lastTime ? `<span class="chat-time">${lastTime}</span>` : ''}
           ${chat.unread ? `<span class="badge">${chat.unread}</span>` : ''}
-          ${voiceCount ? `<span class="type-pill">🎧 ${voiceCount}</span>` : `<span class="type-pill">${typeLabel(chat)}</span>`}
+          ${voiceCount ? `<span class="type-pill icon-pill">${iconHtml('headphones')} ${voiceCount}</span>` : `<span class="type-pill">${typeLabel(chat)}</span>`}
         </span>
       </button>
     `;
@@ -512,7 +537,6 @@
     if (action === 'discover') showDiscoverModal();
     if (action === 'settings') showSettingsModal();
     if (action === 'admin') showAdminModal();
-    if (action === 'logout') logout(true);
   }
 
   async function selectChat(chatId) {
@@ -535,7 +559,7 @@
     const chat = selectedChat();
     if (!chat) {
       pane.innerHTML = `
-        <div class="chat-header"><button class="round-btn mobile-menu-btn" data-mobile-menu>☰</button><div class="chat-header-title">PulseLink</div></div>
+        <div class="chat-header"><button class="round-btn mobile-menu-btn" data-mobile-menu aria-label="Меню">${iconHtml('menu')}</button><div class="chat-header-title">PulseLink</div></div>
         <div class="messages"><div class="empty-state">${logoHtml('large-logo')}<h2>Выберите чат</h2><p>Создайте личный чат, группу или найдите публичное сообщество в обзоре.</p></div></div>
       `;
       $('[data-mobile-menu]', pane)?.addEventListener('click', () => toggleSidebar());
@@ -546,21 +570,21 @@
       : `${chat.members?.length || chat.participants?.length || 0} участников · ${chat.public ? 'публичное' : 'приватное'}`;
     pane.innerHTML = `
       <header class="chat-header">
-        <button class="round-btn mobile-menu-btn" data-mobile-menu>☰</button>
+        <button class="round-btn mobile-menu-btn" data-mobile-menu aria-label="Меню">${iconHtml('menu')}</button>
         ${chatIconHtml(chat)}
         <div>
           <div class="chat-header-title">${escapeHtml(chat.title)}</div>
           <div class="chat-header-sub">${escapeHtml(memberSummary)}${chat.type === 'channel' ? ' · публикуют админы' : ''}</div>
         </div>
         <div class="header-actions">
-          <button class="round-btn ${state.detailsOpen ? 'active' : ''}" data-details-toggle title="Информация">ℹ️</button>
+          <button class="round-btn ${state.detailsOpen ? 'active' : ''}" data-details-toggle title="Информация" aria-label="Информация">${iconHtml('info')}</button>
         </div>
       </header>
       <div id="messages" class="messages"></div>
       <form id="composer" class="composer">
         <div id="recordingChip" class="recording-chip"><span class="record-dot"></span><span>Идёт запись… <b id="recordingTimer">0:00</b></span></div>
         <div class="composer-box">
-          <button class="round-btn" type="button" id="recordButton" title="Голосовое сообщение">🎙</button>
+          <button class="round-btn" type="button" id="recordButton" title="Голосовое сообщение" aria-label="Голосовое сообщение">${iconHtml('mic')}</button>
           <button class="round-btn" type="button" id="stopRecordButton" title="Остановить запись" hidden>⏹</button>
           <textarea id="messageInput" class="input" placeholder="${chat.canPost ? 'Напишите сообщение…' : 'В этом канале публикуют только администраторы'}" ${chat.canPost ? '' : 'disabled'}></textarea>
           <button class="primary-btn send-button" type="submit" ${chat.canPost ? '' : 'disabled'}>Отправить</button>
@@ -591,7 +615,7 @@
     if (!wrap || !chat) return;
     const messages = state.messages.get(chat.id) || [];
     if (!messages.length) {
-      wrap.innerHTML = `<div class="empty-state"><h2>${chat.type === 'saved' ? 'Ваше избранное 🔖' : 'Пока пусто'}</h2><p>${chat.type === 'saved' ? 'Сохраняйте здесь заметки и голосовые — их видите только вы.' : 'Отправьте первое сообщение или голосовое.'}</p></div>`;
+      wrap.innerHTML = `<div class="empty-state"><h2>${chat.type === 'saved' ? 'Ваше избранное' : 'Пока пусто'}</h2><p>${chat.type === 'saved' ? 'Сохраняйте здесь заметки и голосовые — их видите только вы.' : 'Отправьте первое сообщение или голосовое.'}</p></div>`;
       return;
     }
     let lastDay = '';
@@ -834,7 +858,7 @@
       <div class="details-header">
         <div class="button-row" style="justify-content:space-between">
           <div class="modal-title">${escapeHtml(chat.title)}</div>
-          <button class="round-btn" data-close-details>×</button>
+          <button class="round-btn" data-close-details aria-label="Закрыть">${iconHtml('close')}</button>
         </div>
         <div class="muted">${escapeHtml(chat.description || typeLabel(chat))}</div>
       </div>
@@ -881,10 +905,10 @@
     return `
       <div class="voice-channel">
         <div class="voice-channel-head">
-          <div class="voice-channel-name">🔊 ${escapeHtml(channel.name)}</div>
+          <div class="voice-channel-name">${iconHtml('volume')} ${escapeHtml(channel.name)}</div>
           <div class="voice-channel-actions">
             <button class="mini-btn" data-join-voice="${channel.id}">${active ? 'Войти снова' : 'Войти'}</button>
-            <button class="mini-btn" data-listen-voice="${channel.id}">🎧</button>
+            <button class="mini-btn" data-listen-voice="${channel.id}" title="Режим слушателя" aria-label="Режим слушателя">${iconHtml('headphones')}</button>
           </div>
         </div>
         <div class="voice-users">
@@ -892,7 +916,7 @@
             <div class="voice-user-row ${user.speaking ? 'speaking' : ''}">
               ${avatarHtml(user, 'tiny')}
               <div class="member-name">${escapeHtml(user.nickname)}</div>
-              <div class="voice-state-icons">${user.listener ? '🎧' : ''}${user.muted ? ' 🔇' : ' 🎙'}</div>
+              <div class="voice-state-icons">${user.listener ? iconHtml('headphones') : ''}${user.muted ? iconHtml('micOff') : iconHtml('mic')}</div>
             </div>
           `).join('') || '<div class="tiny-text">Пока никто не подключен</div>'}
         </div>
@@ -1040,7 +1064,7 @@
     modalRoot.innerHTML = `
       <div class="modal-backdrop" data-modal-backdrop>
         <section class="modal ${wide ? 'wide' : ''}" role="dialog" aria-modal="true">
-          <header class="modal-head"><div class="modal-title">${escapeHtml(title)}</div><button class="round-btn" data-modal-close>×</button></header>
+          <header class="modal-head"><div class="modal-title">${escapeHtml(title)}</div><button class="round-btn" data-modal-close aria-label="Закрыть">${iconHtml('close')}</button></header>
           <div class="modal-body">${bodyHtml}</div>
         </section>
       </div>
@@ -1081,7 +1105,7 @@
     const body = openModal(type === 'channel' ? 'Создать канал' : 'Создать группу', `
       <form id="createCommunityForm" class="modal-grid">
         <div class="avatar-upload">
-          <span id="communityAvatarPreview" class="avatar-fallback large">${type === 'channel' ? '📣' : '👥'}</span>
+          <span id="communityAvatarPreview" class="avatar-fallback large">${iconHtml(type === 'channel' ? 'channel' : 'users')}</span>
           <div>
             <label class="secondary-btn" for="communityAvatarInput">Загрузить аватар</label>
             <input id="communityAvatarInput" type="file" accept="image/*" hidden>
@@ -1210,7 +1234,10 @@
           <label class="field"><span>Отправка</span><select class="select" name="sendMode"><option value="enter" ${s.sendMode === 'enter' ? 'selected' : ''}>Enter</option><option value="ctrlEnter" ${s.sendMode === 'ctrlEnter' ? 'selected' : ''}>Ctrl+Enter</option></select></label>
         </div>
         <label class="field scale-field"><span>Масштаб интерфейса: <b id="uiScaleValue">${Math.round((Number(s.uiScale) || 1) * 100)}%</b></span><input class="range-input" name="uiScale" type="range" min="85" max="120" step="5" value="${Math.round((Number(s.uiScale) || 1) * 100)}"></label>
-        <button class="primary-btn" type="submit">Сохранить</button>
+        <div class="settings-actions">
+          <button class="danger-btn" type="button" id="settingsLogout">${iconHtml('logout')} Выйти из аккаунта</button>
+          <button class="primary-btn" type="submit">Сохранить</button>
+        </div>
       </form>
     `);
     $('#profileAvatarInput', body).addEventListener('change', async (event) => {
@@ -1223,6 +1250,10 @@
       const value = Number(event.target.value || 100);
       $('#uiScaleValue', body).textContent = `${value}%`;
       document.documentElement.style.setProperty('--ui-scale', (value / 100).toFixed(2));
+    });
+    $('#settingsLogout', body)?.addEventListener('click', async () => {
+      closeModal();
+      await logout(true);
     });
     $('#settingsForm', body).addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -1248,7 +1279,7 @@
   }
 
   async function showAdminModal() {
-    const body = openModal('Админ-панель 🛡', '<div class="muted">Загрузка…</div>', { wide: true });
+    const body = openModal('Админ-панель', '<div class="muted">Загрузка…</div>', { wide: true });
     try {
       const [{ stats }, { users }] = await Promise.all([api('/api/admin/stats'), api('/api/admin/users')]);
       body.innerHTML = `
@@ -1668,9 +1699,9 @@
     const chat = state.chats.find((item) => item.id === voice.chatId);
     const channel = chat?.voiceChannels?.find((item) => item.id === voice.channelId);
     wrap.innerHTML = `
-      <strong>🔊 ${escapeHtml(channel?.name || 'Голос')}</strong>
-      <button class="secondary-btn" data-voice-mute>${voice.muted ? '🎙 Включить' : '🔇 Мьют'}</button>
-      <button class="secondary-btn" data-voice-listener>${voice.listener ? '🎙 Говорить' : '🎧 Слушатель'}</button>
+      <strong>${iconHtml('volume')} ${escapeHtml(channel?.name || 'Голос')}</strong>
+      <button class="secondary-btn" data-voice-mute>${iconHtml(voice.muted ? 'mic' : 'micOff')} ${voice.muted ? 'Включить' : 'Мьют'}</button>
+      <button class="secondary-btn" data-voice-listener>${iconHtml(voice.listener ? 'mic' : 'headphones')} ${voice.listener ? 'Говорить' : 'Слушатель'}</button>
       <button class="danger-btn" data-voice-leave>Выйти</button>
     `;
     $('[data-voice-mute]', wrap)?.addEventListener('click', toggleVoiceMute);
