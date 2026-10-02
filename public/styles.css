@@ -1849,3 +1849,13 @@ body {
     padding-bottom: max(12px, env(safe-area-inset-bottom));
   }
 }
+
+/* Fix: chat rows should stay compact and not stretch to fill the left sidebar. */
+.chat-list {
+  align-content: start;
+  grid-auto-rows: max-content;
+}
+.chat-item {
+  align-self: start;
+  min-height: 58px;
+}
