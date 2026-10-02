@@ -1060,10 +1060,11 @@
     renderDetails();
   }
 
-  function openModal(title, bodyHtml, { wide = false } = {}) {
+  function openModal(title, bodyHtml, { wide = false, compact = false } = {}) {
+    const modalClass = ['modal', wide ? 'wide' : '', compact ? 'compact' : ''].filter(Boolean).join(' ');
     modalRoot.innerHTML = `
       <div class="modal-backdrop" data-modal-backdrop>
-        <section class="modal ${wide ? 'wide' : ''}" role="dialog" aria-modal="true">
+        <section class="${modalClass}" role="dialog" aria-modal="true">
           <header class="modal-head"><div class="modal-title">${escapeHtml(title)}</div><button class="round-btn" data-modal-close aria-label="Закрыть">${iconHtml('close')}</button></header>
           <div class="modal-body">${bodyHtml}</div>
         </section>
@@ -1103,26 +1104,23 @@
   function showCreateCommunityModal(type) {
     let avatar = '';
     const body = openModal(type === 'channel' ? 'Создать канал' : 'Создать группу', `
-      <form id="createCommunityForm" class="modal-grid">
-        <div class="avatar-upload">
-          <span id="communityAvatarPreview" class="avatar-fallback large">${iconHtml(type === 'channel' ? 'channel' : 'users')}</span>
-          <div>
-            <label class="secondary-btn" for="communityAvatarInput">Загрузить аватар</label>
-            <input id="communityAvatarInput" type="file" accept="image/*" hidden>
-            <div class="hint">Клиент обрежет фото по центру и сожмёт в dataURL.</div>
-          </div>
+      <form id="createCommunityForm" class="modal-grid compact-create">
+        <div class="compact-avatar-row">
+          <span id="communityAvatarPreview" class="avatar-fallback small">${iconHtml(type === 'channel' ? 'channel' : 'users')}</span>
+          <label class="ghost-btn compact-upload" for="communityAvatarInput">Аватар</label>
+          <input id="communityAvatarInput" type="file" accept="image/*" hidden>
         </div>
-        <label class="field"><span>Название</span><input class="input" name="title" maxlength="80" required></label>
-        <label class="field"><span>Описание</span><textarea class="textarea" name="description" maxlength="280"></textarea></label>
-        <label class="check-row"><input type="checkbox" name="public" checked><span>Публичное — видно в обзоре сообществ</span></label>
+        <label class="field"><span>Название</span><input class="input" name="title" maxlength="80" placeholder="Например: Команда Pulse" required></label>
+        <label class="field"><span>Описание</span><textarea class="textarea compact-textarea" name="description" maxlength="280" rows="3" placeholder="Коротко о сообществе"></textarea></label>
+        <label class="check-row compact-check"><input type="checkbox" name="public" checked><span>Публичное сообщество</span></label>
         <button class="primary-btn" type="submit">Создать</button>
       </form>
-    `);
+    `, { compact: true });
     $('#communityAvatarInput', body).addEventListener('change', async (event) => {
       const file = event.target.files?.[0];
       if (!file) return;
       avatar = await compressImage(file);
-      $('#communityAvatarPreview', body).outerHTML = `<img id="communityAvatarPreview" class="avatar large" src="${avatar}" alt="">`;
+      $('#communityAvatarPreview', body).outerHTML = `<img id="communityAvatarPreview" class="avatar small" src="${avatar}" alt="">`;
     });
     $('#createCommunityForm', body).addEventListener('submit', async (event) => {
       event.preventDefault();
