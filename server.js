@@ -1203,9 +1203,12 @@ function serveStatic(req, res, parsedUrl) {
         res.writeHead(500);
         return res.end('Read error');
       }
+      const cacheControl = /\.(html|css|js)$/i.test(filePath)
+        ? 'no-cache, no-store, must-revalidate'
+        : 'public, max-age=3600';
       res.writeHead(200, {
         'Content-Type': contentType(filePath),
-        'Cache-Control': filePath.endsWith('.html') ? 'no-cache' : 'public, max-age=3600'
+        'Cache-Control': cacheControl
       });
       res.end(data);
     });
