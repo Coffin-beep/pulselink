@@ -937,6 +937,23 @@ async function handleApi(req, res, parsedUrl) {
       return sendJson(res, 201, { message: messageDto(message, user) });
     }
 
+    params = matches(pathname, '/api/chats/:chatId/messages/:messageId');
+    if (params && req.method === 'DELETE') {
+      const chat = db.chats.find((item) => item.id === params.chatId);
+      if (!chat || !canSeeChat(chat, user)) return sendError(res, 404, 'Чат не найден');
+      const message = db.messages.find((item) => item.id === params.messageId && item.chatId === chat.id);
+      if (!message) return sendError(res, 404, 'Сообщение не найдено');
+      const canDelete = message.senderId === user.id || isChatAdmin(chat, user) || isGlobalAdmin(user);
+      if (!canDelete) return sendError(res, 403, 'Можно удалять только свои сообщения');
+      db.messages = db.messages.filter((item) => item.id !== message.id);
+      const last = lastMessage(chat.id);
+      chat.updatedAt = last ? last.createdAt : (chat.createdAt || now());
+      writeDb();
+      broadcastToChat(chat, 'message_deleted', { chatId: chat.id, messageId: message.id, deletedBy: user.id });
+      broadcastToChat(chat, 'chat_updated', { chat: null, chatId: chat.id });
+      return sendJson(res, 200, { ok: true, messageId: message.id });
+    }
+
     params = matches(pathname, '/api/chats/:chatId/voice-messages');
     if (params && req.method === 'POST') {
       const chat = db.chats.find((item) => item.id === params.chatId);

@@ -167,6 +167,7 @@
     menu: '<path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/>',
     info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5"/><path d="M12 8h.01"/>',
     close: '<path d="M6 6l12 12"/><path d="M18 6 6 18"/>',
+    trash: '<path d="M5 7h14"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M8 7l.6 12.2c.05 1 1 1.8 2 1.8h2.8c1 0 1.95-.8 2-1.8L16 7"/><path d="M9 7V4.8C9 3.8 9.8 3 10.8 3h2.4c1 0 1.8.8 1.8 1.8V7"/>',
     logout: '<path d="M10 5H6.8C5.8 5 5 5.8 5 6.8v10.4c0 1 .8 1.8 1.8 1.8H10"/><path d="M14 8l4 4-4 4"/><path d="M18 12H9"/>'
   };
 
@@ -654,7 +655,13 @@
       return divider + messageHtml(message, chat);
     }).join('');
     setupVoicePlayers(wrap);
+    setupMessageActions(wrap);
     requestAnimationFrame(() => { wrap.scrollTop = wrap.scrollHeight; });
+  }
+
+  function canDeleteMessage(message, chat) {
+    if (!message || message.system) return false;
+    return message.senderId === state.me?.id || Boolean(chat?.canAdmin) || isGlobalAdmin();
   }
 
   function messageHtml(message, chat) {
@@ -662,10 +669,14 @@
     const own = message.senderId === state.me.id;
     const sender = message.sender || { nickname: 'Unknown', username: '@unknown' };
     const read = own && chat.type === 'direct' && (chat.participants || []).every((id) => id === state.me.id || (message.readBy || []).includes(id));
+    const deleteButton = canDeleteMessage(message, chat)
+      ? `<button class="message-delete-btn" type="button" data-delete-message="${message.id}" title="Удалить сообщение" aria-label="Удалить сообщение">${iconHtml('trash')}</button>`
+      : '';
     return `
       <div class="message-row ${own ? 'own' : ''}" data-message-id="${message.id}">
         ${avatarHtml(sender, 'small')}
         <div class="message-bubble">
+          ${deleteButton}
           ${!own ? `<div class="message-name">${escapeHtml(sender.nickname)} · ${escapeHtml(sender.username)}</div>` : ''}
           ${message.kind === 'voice' ? voiceMessageHtml(message) : message.kind === 'file' ? fileMessageHtml(message) : `<div class="message-text">${escapeHtml(message.text)}</div>`}
           <div class="message-foot"><span>${formatTime(message.createdAt)}</span>${own ? `<span class="read-status ${read ? 'read' : ''}">${read ? '✓✓' : '✓'}</span>` : ''}</div>
@@ -695,6 +706,41 @@
         <span class="file-message-meta"><strong>${escapeHtml(name)}</strong><small>${escapeHtml(formatFileSize(message.fileSize))}</small></span>
       </a>
     `;
+  }
+
+  function setupMessageActions(root) {
+    $$('[data-delete-message]', root).forEach((button) => {
+      button.addEventListener('click', async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        await deleteMessage(button.dataset.deleteMessage);
+      });
+    });
+  }
+
+  async function deleteMessage(messageId) {
+    const chat = selectedChat();
+    if (!chat || !messageId) return;
+    if (!confirm('Удалить сообщение?')) return;
+    try {
+      await api(`/api/chats/${encodeURIComponent(chat.id)}/messages/${encodeURIComponent(messageId)}`, { method: 'DELETE' });
+      removeMessage(chat.id, messageId);
+    } catch (error) {
+      toast(error.message || 'Не удалось удалить сообщение', 'error');
+    }
+  }
+
+  function removeMessage(chatId, messageId) {
+    const list = state.messages.get(chatId) || [];
+    const next = list.filter((message) => message.id !== messageId);
+    state.messages.set(chatId, next);
+    const chat = state.chats.find((item) => item.id === chatId);
+    if (chat && chat.lastMessage?.id === messageId) {
+      chat.lastMessage = next[next.length - 1] || null;
+      chat.updatedAt = chat.lastMessage?.createdAt || chat.createdAt;
+    }
+    renderSidebar();
+    if (state.selectedChatId === chatId) renderMessages();
   }
 
   function setupVoicePlayers(root) {
@@ -1514,6 +1560,10 @@
         message.readBy = [...new Set([...(message.readBy || []), data.userId])];
       }
       if (state.selectedChatId === data.chatId) renderMessages();
+    });
+    source.addEventListener('message_deleted', (event) => {
+      const data = JSON.parse(event.data);
+      removeMessage(data.chatId, data.messageId);
     });
     source.addEventListener('chat_updated', async () => {
       await loadChats();

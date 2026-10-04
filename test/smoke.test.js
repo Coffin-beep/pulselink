@@ -99,6 +99,15 @@ test('PulseLink API smoke flow', async () => {
     assert.equal(file.message.kind, 'file');
     assert.equal(file.message.fileName, 'note.txt');
 
+    const deleted = await json(await fetch(`${baseUrl}/api/chats/${group.chat.id}/messages/${sent.message.id}`, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${alice.token}` }
+    }));
+    assert.equal(deleted.ok, true);
+    const afterDelete = await json(await fetch(`${baseUrl}/api/chats/${group.chat.id}/messages`, { headers: { authorization: `Bearer ${alice.token}` } }));
+    assert.ok(!afterDelete.messages.some((message) => message.id === sent.message.id));
+    assert.ok(afterDelete.messages.some((message) => message.id === file.message.id));
+
     const admin = await json(await fetch(`${baseUrl}/api/login`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

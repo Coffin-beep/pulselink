@@ -2263,3 +2263,50 @@ body {
     animation: none;
   }
 }
+
+/* Message deletion affordance. */
+.message-bubble {
+  position: relative;
+}
+.message-delete-btn {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(251, 113, 133, 0.20);
+  border-radius: 10px;
+  color: #fecdd3;
+  background: rgba(31, 17, 52, 0.72);
+  opacity: 0;
+  transform: translateY(-3px) scale(.96);
+  transition: opacity .14s ease, transform .14s ease, background .14s ease, border-color .14s ease;
+  z-index: 4;
+}
+.message-delete-btn .ui-icon {
+  width: 15px;
+  height: 15px;
+}
+.message-bubble:hover .message-delete-btn,
+.message-delete-btn:focus-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+.message-delete-btn:hover {
+  background: rgba(251, 113, 133, 0.18);
+  border-color: rgba(251, 113, 133, 0.36);
+}
+.message-row:not(.own) .message-bubble:has(.message-delete-btn) {
+  padding-right: 44px;
+}
+.message-row.own .message-bubble:has(.message-delete-btn) {
+  padding-right: 44px;
+}
+@media (hover: none) {
+  .message-delete-btn {
+    opacity: 1;
+    transform: none;
+  }
+}
