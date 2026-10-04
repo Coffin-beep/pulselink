@@ -2194,3 +2194,72 @@ body {
     width: 100%;
   }
 }
+
+/* Animated presence pulse around avatars instead of text online/offline labels. */
+.presence-avatar {
+  --pulse-color: #a78bfa;
+  --pulse-speed: 1.8s;
+  --pulse-scale: 1.18;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: fit-content;
+  height: fit-content;
+  flex: 0 0 auto;
+  border-radius: 18px;
+}
+.presence-avatar.large { border-radius: 26px; }
+.presence-avatar.small { border-radius: 13px; }
+.presence-avatar.tiny { border-radius: 9px; }
+.presence-avatar .avatar,
+.presence-avatar .avatar-fallback {
+  position: relative;
+  z-index: 2;
+}
+.presence-avatar::before,
+.presence-avatar::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  pointer-events: none;
+  border: 2px solid var(--pulse-color);
+  opacity: .62;
+  transform: scale(1);
+  animation: avatarPulse var(--pulse-speed) ease-out infinite;
+}
+.presence-avatar::after {
+  inset: -7px;
+  opacity: .24;
+  animation-delay: calc(var(--pulse-speed) / -2);
+}
+.presence-avatar.pulse-active { --pulse-color: #a78bfa; --pulse-speed: 1.8s; --pulse-scale: 1.15; }
+.presence-avatar.pulse-typing { --pulse-color: #e879f9; --pulse-speed: .72s; --pulse-scale: 1.26; }
+.presence-avatar.pulse-music { --pulse-color: #60a5fa; --pulse-speed: 1.05s; --pulse-scale: 1.20; }
+.presence-avatar.pulse-walking { --pulse-color: #34d399; --pulse-speed: 1.28s; --pulse-scale: 1.18; }
+.presence-avatar.pulse-focus { --pulse-color: #fbbf24; --pulse-speed: 2.5s; --pulse-scale: 1.10; }
+.presence-avatar.pulse-offline { --pulse-color: #64748b; }
+.presence-avatar.pulse-offline::before {
+  opacity: .28;
+  animation: none;
+}
+.presence-avatar.pulse-offline::after,
+.presence-avatar.pulse-none::before,
+.presence-avatar.pulse-none::after {
+  display: none;
+}
+.presence-avatar.pulse-offline .avatar,
+.presence-avatar.pulse-offline .avatar-fallback {
+  filter: saturate(.55) brightness(.78);
+}
+@keyframes avatarPulse {
+  0% { opacity: .70; transform: scale(1); }
+  65% { opacity: .16; transform: scale(var(--pulse-scale)); }
+  100% { opacity: 0; transform: scale(var(--pulse-scale)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .presence-avatar::before,
+  .presence-avatar::after {
+    animation: none;
+  }
+}

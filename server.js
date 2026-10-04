@@ -38,7 +38,8 @@ function defaultSettings() {
     notifications: false,
     sendMode: 'enter',
     compactMode: false,
-    uiScale: 1
+    uiScale: 1,
+    activityStatus: 'active'
   };
 }
 
@@ -97,6 +98,7 @@ function migrateDb() {
     user.settings = dropLegacyAppearanceSettings({ ...defaultSettings(), ...(user.settings || {}) });
     if (!Number.isFinite(Number(user.settings.uiScale))) user.settings.uiScale = 1;
     user.settings.uiScale = Math.max(0.85, Math.min(1.2, Number(user.settings.uiScale)));
+    if (!['active', 'music', 'walking', 'focus'].includes(user.settings.activityStatus)) user.settings.activityStatus = 'active';
     if (!user.password || !user.password.hash || !user.password.salt) {
       user.password = hashPassword(crypto.randomBytes(12).toString('hex'));
     }
@@ -259,6 +261,7 @@ function publicUser(user, viewer = null, includeEmail = false) {
     role: user.role,
     banned: Boolean(user.banned),
     online: isUserOnline(user.id),
+    activityStatus: user.settings?.activityStatus || 'active',
     lastSeen: user.lastSeen,
     createdAt: user.createdAt,
     settings: viewer && viewer.id === user.id ? { ...defaultSettings(), ...(user.settings || {}) } : undefined
@@ -622,7 +625,12 @@ function isUserOnline(userId) {
 }
 
 function onlinePayload() {
-  return db.users.map((user) => ({ id: user.id, online: isUserOnline(user.id), lastSeen: user.lastSeen }));
+  return db.users.map((user) => ({
+    id: user.id,
+    online: isUserOnline(user.id),
+    lastSeen: user.lastSeen,
+    activityStatus: user.settings?.activityStatus || 'active'
+  }));
 }
 
 function writeSse(res, event, payload) {
@@ -787,6 +795,9 @@ async function handleApi(req, res, parsedUrl) {
         if (typeof incoming.compactMode === 'boolean') user.settings.compactMode = incoming.compactMode;
         if (Number.isFinite(Number(incoming.uiScale))) {
           user.settings.uiScale = Math.max(0.85, Math.min(1.2, Number(incoming.uiScale)));
+        }
+        if (['active', 'music', 'walking', 'focus'].includes(incoming.activityStatus)) {
+          user.settings.activityStatus = incoming.activityStatus;
         }
         dropLegacyAppearanceSettings(user.settings);
       }

@@ -20,6 +20,8 @@
     authMode: 'login',
     recording: null,
     voice: null,
+    localActivity: null,
+    localActivityTimer: null,
     lastRenderedShell: false
   };
 
@@ -28,7 +30,8 @@
     notifications: false,
     sendMode: 'enter',
     compactMode: false,
-    uiScale: 1
+    uiScale: 1,
+    activityStatus: 'active'
   };
 
   const $ = (selector, root = document) => root.querySelector(selector);
@@ -172,10 +175,24 @@
     return `<svg class="ui-icon ${extra}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${body}</svg>`;
   }
 
+  function activityFor(entity) {
+    if (!entity?.id || !entity.username) return 'none';
+    const onlineState = state.online.get(entity.id);
+    const isSelf = state.me?.id === entity.id;
+    const isOnline = isSelf || Boolean(onlineState?.online ?? entity.online);
+    if (!isOnline) return 'offline';
+    if (isSelf && state.localActivity) return state.localActivity;
+    return onlineState?.activityStatus || entity.activityStatus || entity.settings?.activityStatus || 'active';
+  }
+
   function avatarHtml(entity, size = '', fallback = 'P') {
     const cls = ['avatar', size].filter(Boolean).join(' ');
-    if (entity?.avatar) return `<img class="${cls}" src="${entity.avatar}" alt="">`;
-    return `<span class="avatar-fallback ${size || ''}">${initials(entity?.nickname || entity?.title || entity?.rawTitle || fallback)}</span>`;
+    const activity = activityFor(entity);
+    const pulseCls = ['presence-avatar', size, `pulse-${activity}`].filter(Boolean).join(' ');
+    const content = entity?.avatar
+      ? `<img class="${cls}" src="${entity.avatar}" alt="">`
+      : `<span class="avatar-fallback ${size || ''}">${initials(entity?.nickname || entity?.title || entity?.rawTitle || fallback)}</span>`;
+    return `<span class="${pulseCls}" data-activity="${activity}">${content}</span>`;
   }
 
   function chatIconHtml(chat) {
@@ -605,6 +622,7 @@
     $('[data-details-toggle]', pane)?.addEventListener('click', () => toggleDetails());
     $('#composer')?.addEventListener('submit', sendTextMessage);
     $('#messageInput')?.addEventListener('keydown', handleComposerKeydown);
+    $('#messageInput')?.addEventListener('input', markLocalTyping);
     $('#attachButton')?.addEventListener('click', () => $('#fileInput')?.click());
     $('#fileInput')?.addEventListener('change', handleFileAttachment);
     $('#recordButton')?.addEventListener('click', startVoiceMessageRecording);
@@ -616,8 +634,7 @@
   function directSubtitle(chat) {
     const other = (chat.members || []).find((member) => member.id !== state.me.id);
     if (!other) return 'личный чат';
-    const online = state.online.get(other.id)?.online || other.online;
-    return `${other.username} · ${online ? 'online' : `был(а) ${formatTime(other.lastSeen)}`}`;
+    return other.username;
   }
 
   function renderMessages() {
@@ -745,6 +762,26 @@
     }
   }
 
+  function markLocalTyping() {
+    if (!state.me) return;
+    state.localActivity = 'typing';
+    clearTimeout(state.localActivityTimer);
+    renderSidebar();
+    renderDetails();
+    state.localActivityTimer = setTimeout(() => {
+      state.localActivity = null;
+      renderSidebar();
+      renderDetails();
+    }, 1500);
+  }
+
+  function clearLocalTyping() {
+    clearTimeout(state.localActivityTimer);
+    state.localActivity = null;
+    renderSidebar();
+    renderDetails();
+  }
+
   async function sendTextMessage(event) {
     event.preventDefault();
     const chat = selectedChat();
@@ -752,6 +789,7 @@
     const text = input?.value.trim();
     if (!chat || !text) return;
     input.value = '';
+    clearLocalTyping();
     try {
       const data = await api(`/api/chats/${encodeURIComponent(chat.id)}/messages`, { method: 'POST', body: JSON.stringify({ text }) });
       appendMessage(chat.id, data.message);
@@ -1017,7 +1055,7 @@
         ${avatarHtml(member, 'small')}
         <div>
           <div class="member-name">${escapeHtml(member.nickname)}</div>
-          <div class="member-role">${escapeHtml(member.username)} · ${role} · ${(state.online.get(member.id)?.online || member.online) ? 'online' : 'offline'}</div>
+          <div class="member-role">${escapeHtml(member.username)} · ${role}</div>
         </div>
         <div class="member-actions">
           ${canManage && isOwner && chat.ownerId !== member.id ? `<button class="mini-btn" data-member-action="${(chat.admins || []).includes(member.id) ? 'member' : 'admin'}" data-member-id="${member.id}">${(chat.admins || []).includes(member.id) ? 'снять' : 'админ'}</button>` : ''}
@@ -1297,6 +1335,7 @@
           </div>
           <div class="settings-grid-compact">
             <label class="field"><span>Отправка сообщений</span><select class="select" name="sendMode"><option value="enter" ${s.sendMode === 'enter' ? 'selected' : ''}>Enter</option><option value="ctrlEnter" ${s.sendMode === 'ctrlEnter' ? 'selected' : ''}>Ctrl+Enter</option></select></label>
+            <label class="field"><span>Пульс активности</span><select class="select" name="activityStatus"><option value="active" ${s.activityStatus === 'active' ? 'selected' : ''}>Обычный</option><option value="music" ${s.activityStatus === 'music' ? 'selected' : ''}>Музыка</option><option value="walking" ${s.activityStatus === 'walking' ? 'selected' : ''}>В движении</option><option value="focus" ${s.activityStatus === 'focus' ? 'selected' : ''}>Фокус</option></select></label>
             <label class="field scale-field"><span>Масштаб: <b id="uiScaleValue">${scaleValue}%</b></span><input class="range-input pretty-range" name="uiScale" type="range" min="85" max="120" step="5" value="${scaleValue}" style="--range-progress:${scaleProgress}%"></label>
           </div>
         </section>
@@ -1331,6 +1370,7 @@
         notifications: Boolean(form.notifications),
         compactMode: Boolean(form.compactMode),
         sendMode: form.sendMode,
+        activityStatus: form.activityStatus || 'active',
         uiScale: Math.max(0.85, Math.min(1.2, Number(form.uiScale || 100) / 100))
       };
       if (nextSettings.notifications && window.Notification?.permission === 'default') {
@@ -1790,6 +1830,8 @@
       try { await api('/api/logout', { method: 'POST', body: '{}' }); } catch (_error) { /* noop */ }
     }
     await leaveVoice();
+    clearTimeout(state.localActivityTimer);
+    state.localActivity = null;
     disconnectSse();
     stopPolling();
     localStorage.removeItem('pulselink_token');
