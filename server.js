@@ -438,6 +438,10 @@ function messageDto(message, viewer) {
     audioDataUrl: message.kind === 'voice' ? message.audioDataUrl : undefined,
     waveform: message.kind === 'voice' ? (message.waveform || []) : undefined,
     duration: message.kind === 'voice' ? Number(message.duration || 0) : undefined,
+    fileDataUrl: message.kind === 'file' ? message.fileDataUrl : undefined,
+    fileName: message.kind === 'file' ? message.fileName : undefined,
+    fileType: message.kind === 'file' ? message.fileType : undefined,
+    fileSize: message.kind === 'file' ? Number(message.fileSize || 0) : undefined,
     sender: publicUser(sender, viewer),
     senderId: message.senderId,
     readBy: message.readBy || [],
@@ -457,6 +461,10 @@ function createMessage(chat, user, payload) {
     audioDataUrl: payload.audioDataUrl || '',
     waveform: Array.isArray(payload.waveform) ? payload.waveform.slice(0, 128).map((value) => Math.max(0, Math.min(1, Number(value) || 0))) : [],
     duration: Number(payload.duration || 0),
+    fileDataUrl: payload.fileDataUrl || '',
+    fileName: payload.fileName || '',
+    fileType: payload.fileType || '',
+    fileSize: Number(payload.fileSize || 0),
     readBy: [user.id],
     createdAt: now(),
     system: Boolean(payload.system)
@@ -933,6 +941,29 @@ async function handleApi(req, res, parsedUrl) {
         audioDataUrl,
         waveform,
         duration: Number(body.duration || 0)
+      });
+      return sendJson(res, 201, { message: messageDto(message, user) });
+    }
+
+    params = matches(pathname, '/api/chats/:chatId/files');
+    if (params && req.method === 'POST') {
+      const chat = db.chats.find((item) => item.id === params.chatId);
+      if (!chat || !canSeeChat(chat, user)) return sendError(res, 404, 'Чат не найден');
+      if (!canPostToChat(chat, user)) return sendError(res, 403, 'В этом канале публикуют только администраторы');
+      const body = await readJsonBody(req);
+      const fileDataUrl = String(body.fileDataUrl || '');
+      const fileName = String(body.fileName || 'file').trim().slice(0, 160) || 'file';
+      const fileType = String(body.fileType || 'application/octet-stream').trim().slice(0, 120) || 'application/octet-stream';
+      const fileSize = Number(body.fileSize || 0);
+      if (!fileDataUrl.startsWith('data:')) return sendError(res, 400, 'Нужен file dataURL');
+      if (fileDataUrl.length > 14 * 1024 * 1024 || fileSize > 10 * 1024 * 1024) return sendError(res, 400, 'Файл слишком большой');
+      const message = createMessage(chat, user, {
+        kind: 'file',
+        text: fileName,
+        fileDataUrl,
+        fileName,
+        fileType,
+        fileSize
       });
       return sendJson(res, 201, { message: messageDto(message, user) });
     }

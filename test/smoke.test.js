@@ -91,6 +91,14 @@ test('PulseLink API smoke flow', async () => {
     }));
     assert.equal(sent.message.text, 'hello pulse');
 
+    const file = await json(await fetch(`${baseUrl}/api/chats/${group.chat.id}/files`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${alice.token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ fileName: 'note.txt', fileType: 'text/plain', fileSize: 5, fileDataUrl: 'data:text/plain;base64,aGVsbG8=' })
+    }));
+    assert.equal(file.message.kind, 'file');
+    assert.equal(file.message.fileName, 'note.txt');
+
     const admin = await json(await fetch(`${baseUrl}/api/login`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

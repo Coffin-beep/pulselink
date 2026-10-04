@@ -72,6 +72,13 @@
     return `${m}:${s}`;
   }
 
+  function formatFileSize(bytes) {
+    const size = Math.max(0, Number(bytes) || 0);
+    if (size < 1024) return `${size} Б`;
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} КБ`;
+    return `${(size / (1024 * 1024)).toFixed(1)} МБ`;
+  }
+
   function settings() {
     return { ...defaultSettings, ...(state.me?.settings || {}) };
   }
@@ -146,6 +153,8 @@
     channel: '<path d="M5 14.5h3l7 4.5V5L8 9.5H5a2 2 0 0 0-2 2v1a2 2 0 0 0 2 2Z"/><path d="M18 9a4.5 4.5 0 0 1 0 6"/>',
     bookmark: '<path d="M7 5.8C7 4.8 7.8 4 8.8 4h6.4c1 0 1.8.8 1.8 1.8V20l-5-3.2L7 20V5.8Z"/>',
     search: '<circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4 4"/>',
+    paperclip: '<path d="M17.5 10.5 10 18a4.2 4.2 0 0 1-6-6l8.2-8.2a3 3 0 0 1 4.2 4.2L8.3 16.1a1.7 1.7 0 0 1-2.4-2.4l7.4-7.4"/>',
+    file: '<path d="M7 3.8h6.2L18 8.6v11.6H7V3.8Z"/><path d="M13 4v5h5"/><path d="M9.5 13h5"/><path d="M9.5 16h4"/>',
     settings: '<path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Z"/><path d="M19.4 13.5a7.8 7.8 0 0 0 0-3l2-1.5-2-3.4-2.4 1a8.2 8.2 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.6A8.2 8.2 0 0 0 7 6.6l-2.4-1-2 3.4 2 1.5a7.8 7.8 0 0 0 0 3l-2 1.5 2 3.4 2.4-1a8.2 8.2 0 0 0 2.6 1.5l.4 2.6h4l.4-2.6a8.2 8.2 0 0 0 2.6-1.5l2.4 1 2-3.4-2-1.5Z"/>',
     shield: '<path d="M12 3.5 19 6v5.3c0 4.4-2.8 7.7-7 9.2-4.2-1.5-7-4.8-7-9.2V6l7-2.5Z"/><path d="m9.5 12 1.7 1.7 3.7-4"/>',
     mic: '<path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/>',
@@ -482,9 +491,7 @@
             ${avatarHtml(state.me)}
             <span class="me-meta">
               <span class="me-name">${escapeHtml(state.me.nickname)}</span>
-              <span class="me-username">${escapeHtml(state.me.username)} · ${state.me.role === 'superadmin' ? 'главный админ' : state.me.role === 'admin' ? 'админ' : 'online'}</span>
             </span>
-            <span class="online-dot on" title="online"></span>
           </button>
           <div class="profile-actions">
             <button class="round-btn settings-btn" data-action="settings" title="Настройки" aria-label="Настройки">${iconHtml('settings')}</button>
@@ -510,7 +517,7 @@
   function chatListItem(chat) {
     const last = chat.lastMessage;
     let lastText = chat.description || 'Нет сообщений';
-    if (last) lastText = last.kind === 'voice' ? 'Голосовое сообщение' : last.text;
+    if (last) lastText = last.kind === 'voice' ? 'Голосовое сообщение' : last.kind === 'file' ? `Файл: ${last.fileName || 'вложение'}` : last.text;
     const voiceCount = (chat.voiceStates || []).reduce((sum, room) => sum + (room.users?.length || 0), 0);
     const lastTime = last?.createdAt ? formatTime(last.createdAt) : '';
     return `
@@ -584,9 +591,11 @@
       <form id="composer" class="composer">
         <div id="recordingChip" class="recording-chip"><span class="record-dot"></span><span>Идёт запись… <b id="recordingTimer">0:00</b></span></div>
         <div class="composer-box">
-          <button class="round-btn" type="button" id="recordButton" title="Голосовое сообщение" aria-label="Голосовое сообщение">${iconHtml('mic')}</button>
-          <button class="round-btn" type="button" id="stopRecordButton" title="Остановить запись" hidden>⏹</button>
+          <button class="round-btn attach-button" type="button" id="attachButton" title="Прикрепить файл" aria-label="Прикрепить файл" ${chat.canPost ? '' : 'disabled'}>${iconHtml('paperclip')}</button>
+          <input id="fileInput" type="file" hidden>
           <textarea id="messageInput" class="input" placeholder="${chat.canPost ? 'Напишите сообщение…' : 'В этом канале публикуют только администраторы'}" ${chat.canPost ? '' : 'disabled'}></textarea>
+          <button class="round-btn" type="button" id="recordButton" title="Голосовое сообщение" aria-label="Голосовое сообщение" ${chat.canPost ? '' : 'disabled'}>${iconHtml('mic')}</button>
+          <button class="round-btn" type="button" id="stopRecordButton" title="Остановить запись" aria-label="Остановить запись" hidden>${iconHtml('micOff')}</button>
           <button class="primary-btn send-button" type="submit" ${chat.canPost ? '' : 'disabled'}>Отправить</button>
         </div>
         <div class="hint">${settings().sendMode === 'enter' ? 'Enter отправляет, Shift+Enter — новая строка' : 'Ctrl+Enter отправляет, Enter — новая строка'}</div>
@@ -596,6 +605,8 @@
     $('[data-details-toggle]', pane)?.addEventListener('click', () => toggleDetails());
     $('#composer')?.addEventListener('submit', sendTextMessage);
     $('#messageInput')?.addEventListener('keydown', handleComposerKeydown);
+    $('#attachButton')?.addEventListener('click', () => $('#fileInput')?.click());
+    $('#fileInput')?.addEventListener('change', handleFileAttachment);
     $('#recordButton')?.addEventListener('click', startVoiceMessageRecording);
     $('#stopRecordButton')?.addEventListener('click', stopVoiceMessageRecording);
     renderMessages();
@@ -639,7 +650,7 @@
         ${avatarHtml(sender, 'small')}
         <div class="message-bubble">
           ${!own ? `<div class="message-name">${escapeHtml(sender.nickname)} · ${escapeHtml(sender.username)}</div>` : ''}
-          ${message.kind === 'voice' ? voiceMessageHtml(message) : `<div class="message-text">${escapeHtml(message.text)}</div>`}
+          ${message.kind === 'voice' ? voiceMessageHtml(message) : message.kind === 'file' ? fileMessageHtml(message) : `<div class="message-text">${escapeHtml(message.text)}</div>`}
           <div class="message-foot"><span>${formatTime(message.createdAt)}</span>${own ? `<span class="read-status ${read ? 'read' : ''}">${read ? '✓✓' : '✓'}</span>` : ''}</div>
         </div>
       </div>
@@ -654,6 +665,18 @@
         <span class="voice-duration">${formatDuration(message.duration)}</span>
         <audio src="${message.audioDataUrl}" preload="metadata"></audio>
       </div>
+    `;
+  }
+
+  function fileMessageHtml(message) {
+    const name = message.fileName || 'Файл';
+    const type = message.fileType || 'application/octet-stream';
+    const isImage = type.startsWith('image/') && message.fileDataUrl;
+    return `
+      <a class="file-message" href="${message.fileDataUrl || '#'}" download="${escapeHtml(name)}" target="_blank" rel="noopener">
+        <span class="file-message-icon">${isImage ? `<img src="${message.fileDataUrl}" alt="">` : iconHtml('file')}</span>
+        <span class="file-message-meta"><strong>${escapeHtml(name)}</strong><small>${escapeHtml(formatFileSize(message.fileSize))}</small></span>
+      </a>
     `;
   }
 
@@ -735,6 +758,32 @@
     } catch (error) {
       input.value = text;
       toast(error.message, 'error');
+    }
+  }
+
+  async function handleFileAttachment(event) {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = '';
+    const chat = selectedChat();
+    if (!file || !chat?.canPost) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast('Файл должен быть не больше 10 МБ', 'error');
+      return;
+    }
+    const attachButton = $('#attachButton');
+    attachButton?.classList.add('is-loading-soft');
+    try {
+      const fileDataUrl = await blobToDataUrl(file);
+      const data = await api(`/api/chats/${encodeURIComponent(chat.id)}/files`, {
+        method: 'POST',
+        body: JSON.stringify({ fileName: file.name, fileType: file.type || 'application/octet-stream', fileSize: file.size, fileDataUrl })
+      });
+      appendMessage(chat.id, data.message);
+    } catch (error) {
+      toast(error.message || 'Не удалось прикрепить файл', 'error');
+    } finally {
+      attachButton?.classList.remove('is-loading-soft');
     }
   }
 
@@ -1215,6 +1264,7 @@
     let avatar = state.me.avatar || '';
     const s = settings();
     const scaleValue = Math.round((Number(s.uiScale) || 1) * 100);
+    const scaleProgress = Math.round(((scaleValue - 85) / 35) * 100);
     const body = openModal('Профиль и настройки', `
       <form id="settingsForm" class="profile-settings-form">
         <section class="settings-profile-card">
@@ -1247,7 +1297,7 @@
           </div>
           <div class="settings-grid-compact">
             <label class="field"><span>Отправка сообщений</span><select class="select" name="sendMode"><option value="enter" ${s.sendMode === 'enter' ? 'selected' : ''}>Enter</option><option value="ctrlEnter" ${s.sendMode === 'ctrlEnter' ? 'selected' : ''}>Ctrl+Enter</option></select></label>
-            <label class="field scale-field"><span>Масштаб: <b id="uiScaleValue">${scaleValue}%</b></span><input class="range-input" name="uiScale" type="range" min="85" max="120" step="5" value="${scaleValue}"></label>
+            <label class="field scale-field"><span>Масштаб: <b id="uiScaleValue">${scaleValue}%</b></span><input class="range-input pretty-range" name="uiScale" type="range" min="85" max="120" step="5" value="${scaleValue}" style="--range-progress:${scaleProgress}%"></label>
           </div>
         </section>
 
@@ -1266,6 +1316,7 @@
     $('[name="uiScale"]', body)?.addEventListener('input', (event) => {
       const value = Number(event.target.value || 100);
       $('#uiScaleValue', body).textContent = `${value}%`;
+      event.target.style.setProperty('--range-progress', `${Math.max(0, Math.min(100, ((value - 85) / 35) * 100))}%`);
       document.documentElement.style.setProperty('--ui-scale', (value / 100).toFixed(2));
     });
     $('#settingsLogout', body)?.addEventListener('click', async () => {
@@ -1487,7 +1538,7 @@
     if (s.messageSound) playBeep();
     if (s.notifications && document.hidden && window.Notification?.permission === 'granted') {
       const sender = message.sender?.nickname || 'PulseLink';
-      const text = message.kind === 'voice' ? 'Голосовое сообщение' : message.text;
+      const text = message.kind === 'voice' ? 'Голосовое сообщение' : message.kind === 'file' ? `Файл: ${message.fileName || 'вложение'}` : message.text;
       new Notification(sender, { body: text, icon: '/favicon.ico' });
     }
   }
