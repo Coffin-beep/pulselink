@@ -6,6 +6,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { URL } = require('url');
+const { DiplomaticTranslator } = require('./lib/diplomatic-translator');
+const { processOutgoingText } = require('./lib/diplomatic-interceptor');
 
 const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -17,6 +19,7 @@ const MAX_BODY = 32 * 1024 * 1024;
 const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 const ADMIN_USERNAME = '@coffin';
 const DEFAULT_ADMIN_PASSWORD = process.env.PULSELINK_ADMIN_PASSWORD || 'PulseLink2026!';
+const diplomaticTranslator = new DiplomaticTranslator();
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
@@ -39,7 +42,8 @@ function defaultSettings() {
     sendMode: 'enter',
     compactMode: false,
     uiScale: 1,
-    activityStatus: 'active'
+    activityStatus: 'active',
+    diplomaticFilter: false
   };
 }
 
@@ -50,7 +54,7 @@ function dropLegacyAppearanceSettings(settings) {
 
 function defaultDb() {
   return {
-    version: 1,
+    version: 2,
     createdAt: now(),
     users: [],
     chats: [],
@@ -77,7 +81,7 @@ function loadDb() {
 }
 
 function migrateDb() {
-  db.version = db.version || 1;
+  db.version = Math.max(2, Number(db.version) || 1);
   db.createdAt = db.createdAt || now();
   db.users = Array.isArray(db.users) ? db.users : [];
   db.chats = Array.isArray(db.chats) ? db.chats : [];
@@ -99,6 +103,7 @@ function migrateDb() {
     if (!Number.isFinite(Number(user.settings.uiScale))) user.settings.uiScale = 1;
     user.settings.uiScale = Math.max(0.85, Math.min(1.2, Number(user.settings.uiScale)));
     if (!['active', 'music', 'walking', 'focus'].includes(user.settings.activityStatus)) user.settings.activityStatus = 'active';
+    user.settings.diplomaticFilter = Boolean(user.settings.diplomaticFilter);
     if (!user.password || !user.password.hash || !user.password.salt) {
       user.password = hashPassword(crypto.randomBytes(12).toString('hex'));
     }
@@ -130,6 +135,10 @@ function migrateDb() {
     message.text = message.text || '';
     message.readBy = Array.isArray(message.readBy) ? [...new Set(message.readBy)] : [message.senderId].filter(Boolean);
     message.createdAt = message.createdAt || now();
+    message.is_diplomatic_rewrite = Boolean(message.is_diplomatic_rewrite);
+    message.rewrite_style = message.is_diplomatic_rewrite && ['absurd', 'polite', 'cute', 'zen'].includes(message.rewrite_style)
+      ? message.rewrite_style
+      : null;
   }
 
   db.sessions = db.sessions.filter((session) => session && session.token && findUserById(session.userId));
@@ -450,6 +459,8 @@ function messageDto(message, viewer) {
     readBy: message.readBy || [],
     createdAt: message.createdAt,
     editedAt: message.editedAt || null,
+    is_diplomatic_rewrite: Boolean(message.is_diplomatic_rewrite),
+    rewrite_style: message.rewrite_style || null,
     system: Boolean(message.system)
   };
 }
@@ -468,6 +479,8 @@ function createMessage(chat, user, payload) {
     fileName: payload.fileName || '',
     fileType: payload.fileType || '',
     fileSize: Number(payload.fileSize || 0),
+    is_diplomatic_rewrite: Boolean(payload.isDiplomaticRewrite),
+    rewrite_style: payload.isDiplomaticRewrite ? (payload.rewriteStyle || null) : null,
     readBy: [user.id],
     createdAt: now(),
     system: Boolean(payload.system)
@@ -793,6 +806,7 @@ async function handleApi(req, res, parsedUrl) {
         if (typeof incoming.notifications === 'boolean') user.settings.notifications = incoming.notifications;
         if (incoming.sendMode === 'enter' || incoming.sendMode === 'ctrlEnter') user.settings.sendMode = incoming.sendMode;
         if (typeof incoming.compactMode === 'boolean') user.settings.compactMode = incoming.compactMode;
+        if (typeof incoming.diplomaticFilter === 'boolean') user.settings.diplomaticFilter = incoming.diplomaticFilter;
         if (Number.isFinite(Number(incoming.uiScale))) {
           user.settings.uiScale = Math.max(0.85, Math.min(1.2, Number(incoming.uiScale)));
         }
@@ -933,7 +947,13 @@ async function handleApi(req, res, parsedUrl) {
       const text = String(body.text || '').trim();
       if (!text) return sendError(res, 400, 'Сообщение пустое');
       if (text.length > 4000) return sendError(res, 400, 'Сообщение слишком длинное');
-      const message = createMessage(chat, user, { kind: 'text', text });
+      const processed = await processOutgoingText({ sender: user, chat, text, translator: diplomaticTranslator });
+      const message = createMessage(chat, user, {
+        kind: 'text',
+        text: processed.text,
+        isDiplomaticRewrite: processed.isDiplomaticRewrite,
+        rewriteStyle: processed.rewriteStyle
+      });
       return sendJson(res, 201, { message: messageDto(message, user) });
     }
 

@@ -31,7 +31,8 @@
     sendMode: 'enter',
     compactMode: false,
     uiScale: 1,
-    activityStatus: 'active'
+    activityStatus: 'active',
+    diplomaticFilter: false
   };
 
   const $ = (selector, root = document) => root.querySelector(selector);
@@ -679,6 +680,7 @@
           ${deleteButton}
           ${!own ? `<div class="message-name">${escapeHtml(sender.nickname)} · ${escapeHtml(sender.username)}</div>` : ''}
           ${message.kind === 'voice' ? voiceMessageHtml(message) : message.kind === 'file' ? fileMessageHtml(message) : `<div class="message-text">${escapeHtml(message.text)}</div>`}
+          ${own && message.is_diplomatic_rewrite ? '<div class="diplomatic-badge">🎭 Дипломатически перефразировано</div>' : ''}
           <div class="message-foot"><span>${formatTime(message.createdAt)}</span>${own ? `<span class="read-status ${read ? 'read' : ''}">${read ? '✓✓' : '✓'}</span>` : ''}</div>
         </div>
       </div>
@@ -1375,6 +1377,13 @@
         </section>
 
         <section class="settings-section">
+          <div class="settings-section-title">Общение</div>
+          <div class="settings-toggle-list">
+            <label class="settings-toggle"><input type="checkbox" name="diplomaticFilter" ${s.diplomaticFilter ? 'checked' : ''}><span class="toggle-switch"></span><span><strong>Дипломатический фильтр</strong><small>Смягчать мои токсичные сообщения с помощью ИИ</small></span></label>
+          </div>
+        </section>
+
+        <section class="settings-section">
           <div class="settings-section-title">Интерфейс</div>
           <div class="settings-toggle-list">
             <label class="settings-toggle"><input type="checkbox" name="compactMode" ${s.compactMode ? 'checked' : ''}><span class="toggle-switch"></span><span><strong>Компактный режим</strong><small>Меньше отступов в списках и сообщениях</small></span></label>
@@ -1415,6 +1424,7 @@
         messageSound: Boolean(form.messageSound),
         notifications: Boolean(form.notifications),
         compactMode: Boolean(form.compactMode),
+        diplomaticFilter: Boolean(form.diplomaticFilter),
         sendMode: form.sendMode,
         activityStatus: form.activityStatus || 'active',
         uiScale: Math.max(0.85, Math.min(1.2, Number(form.uiScale || 100) / 100))

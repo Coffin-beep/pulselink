@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const net = require('node:net');
+const http = require('node:http');
 
 async function freePort() {
   return new Promise((resolve, reject) => {
@@ -41,10 +42,25 @@ async function json(response) {
 
 test('PulseLink API smoke flow', async () => {
   const port = await freePort();
+  const llmPort = await freePort();
+  const llmServer = http.createServer((_req, res) => {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ is_toxic: true, rewritten: 'Предлагаю обсудить это без запуска табуреток в космос.', style: 'absurd' }) } }] }));
+  });
+  await new Promise((resolve) => llmServer.listen(llmPort, '127.0.0.1', resolve));
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pulselink-test-'));
   const child = spawn(process.execPath, ['server.js'], {
     cwd: path.resolve(__dirname, '..'),
-    env: { ...process.env, PORT: String(port), HOST: '127.0.0.1', PULSELINK_DATA_DIR: dataDir, PULSELINK_ADMIN_PASSWORD: 'test-admin-pass' },
+    env: {
+      ...process.env,
+      PORT: String(port),
+      HOST: '127.0.0.1',
+      PULSELINK_DATA_DIR: dataDir,
+      PULSELINK_ADMIN_PASSWORD: 'test-admin-pass',
+      DIPLOMATIC_LLM_URL: `http://127.0.0.1:${llmPort}/v1/chat/completions`,
+      DIPLOMATIC_LLM_API_KEY: 'test-key',
+      DIPLOMATIC_LLM_MODEL: 'test-model'
+    },
     stdio: ['ignore', 'pipe', 'pipe']
   });
 
@@ -75,6 +91,51 @@ test('PulseLink API smoke flow', async () => {
     assert.equal(bobSaved.length, 1);
     assert.equal(bobSaved[0].ownerId, bob.user.id);
     assert.notEqual(bobSaved[0].id, aliceSaved[0].id);
+    assert.equal(bob.user.settings.diplomaticFilter, false);
+
+    const direct = await json(await fetch(`${baseUrl}/api/chats/direct`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${alice.token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ username: '@bob' })
+    }));
+
+    const unfiltered = await json(await fetch(`${baseUrl}/api/chats/${direct.chat.id}/messages`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${alice.token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ text: 'Ты ужасно всё сделал' })
+    }));
+    assert.equal(unfiltered.message.text, 'Ты ужасно всё сделал');
+    assert.equal(unfiltered.message.is_diplomatic_rewrite, false);
+    assert.equal(unfiltered.message.rewrite_style, null);
+
+    const aliceSettings = await json(await fetch(`${baseUrl}/api/me`, {
+      method: 'PATCH',
+      headers: { authorization: `Bearer ${alice.token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ settings: { diplomaticFilter: true } })
+    }));
+    assert.equal(aliceSettings.user.settings.diplomaticFilter, true);
+
+    const rewritten = await json(await fetch(`${baseUrl}/api/chats/${direct.chat.id}/messages`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${alice.token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ text: 'Ты опять всё ужасно сделал' })
+    }));
+    assert.equal(rewritten.message.text, 'Предлагаю обсудить это без запуска табуреток в космос.');
+    assert.equal(rewritten.message.is_diplomatic_rewrite, true);
+    assert.equal(rewritten.message.rewrite_style, 'absurd');
+
+    const receivedByBob = await json(await fetch(`${baseUrl}/api/chats/${direct.chat.id}/messages`, {
+      headers: { authorization: `Bearer ${bob.token}` }
+    }));
+    const bobCopy = receivedByBob.messages.find((message) => message.id === rewritten.message.id);
+    assert.equal(bobCopy.text, rewritten.message.text);
+    assert.equal(bobCopy.is_diplomatic_rewrite, true);
+
+    await json(await fetch(`${baseUrl}/api/me`, {
+      method: 'PATCH',
+      headers: { authorization: `Bearer ${alice.token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ settings: { diplomaticFilter: false } })
+    }));
 
     const group = await json(await fetch(`${baseUrl}/api/chats`, {
       method: 'POST',
@@ -124,6 +185,7 @@ test('PulseLink API smoke flow', async () => {
     assert.ok(stats.stats.messages >= 1);
   } finally {
     child.kill('SIGTERM');
+    await new Promise((resolve) => llmServer.close(resolve));
     fs.rmSync(dataDir, { recursive: true, force: true });
   }
 });

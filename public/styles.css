@@ -2310,3 +2310,17 @@ body {
     transform: none;
   }
 }
+
+/* Diplomatic rewrite marker shown only on the sender's own message. */
+.diplomatic-badge {
+  width: fit-content;
+  margin-top: 7px;
+  padding: 4px 8px;
+  border: 1px solid rgba(196, 181, 253, .22);
+  border-radius: 999px;
+  color: #ddd6fe;
+  background: rgba(91, 33, 182, .18);
+  font-size: 11px;
+  line-height: 1.25;
+  letter-spacing: .01em;
+}
