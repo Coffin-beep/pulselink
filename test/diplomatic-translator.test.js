@@ -2,103 +2,82 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { DiplomaticTranslator, LruTtlCache, LLM_INPUT_LIMIT } = require('../lib/diplomatic-translator');
+const { DiplomaticTranslator, LruTtlCache, ANALYSIS_INPUT_LIMIT } = require('../lib/diplomatic-translator');
 
-function translatorWith(response, options = {}) {
-  return new DiplomaticTranslator({
-    timeoutMs: options.timeoutMs || 100,
-    llmCall: options.llmCall || (async () => JSON.stringify(response))
-  });
-}
-
-test('toxic text is rewritten', async () => {
-  const translator = translatorWith({ is_toxic: true, rewritten: 'Сударь, ваша идея удивительно смела.', style: 'polite' });
-  const result = await translator.translate('Ты идиот, идея ужасная');
+test('toxic insult is rewritten locally', async () => {
+  const translator = new DiplomaticTranslator();
+  const original = 'Ты идиот, идея ужасная';
+  const result = await translator.translate(original);
   assert.equal(result.isToxic, true);
-  assert.equal(result.rewritten, 'Сударь, ваша идея удивительно смела.');
-  assert.equal(result.style, 'polite');
-  assert.equal(result.fallback, false);
+  assert.notEqual(result.rewritten, original);
+  assert.match(result.rewritten, /виртуоз спорных решений/u);
+  assert.ok(['absurd', 'polite', 'cute', 'zen'].includes(result.style));
 });
 
 test('neutral text remains unchanged', async () => {
-  const original = 'Давайте созвонимся в пять';
-  const translator = translatorWith({ is_toxic: false, rewritten: original, style: 'none' });
+  const translator = new DiplomaticTranslator();
+  const original = 'Я тебя жду, давайте созвонимся в пять';
   const result = await translator.translate(original);
   assert.equal(result.isToxic, false);
   assert.equal(result.rewritten, original);
   assert.equal(result.style, 'none');
 });
 
-test('emergency text remains unchanged when model marks it non-toxic', async () => {
-  const original = 'Срочно вызови скорую, человеку плохо';
-  const translator = translatorWith({ is_toxic: false, rewritten: original, style: 'none' });
+test('emergency text remains unchanged even when it contains aggression', async () => {
+  const translator = new DiplomaticTranslator();
+  const original = 'Срочно вызови скорую, идиот, человеку плохо';
   const result = await translator.translate(original);
   assert.equal(result.isToxic, false);
   assert.equal(result.rewritten, original);
+  assert.equal(result.reason, 'emergency');
 });
 
-test('timeout gracefully falls back to original', async () => {
-  const original = 'Очень злое сообщение';
-  const translator = translatorWith(null, { timeoutMs: 15, llmCall: () => new Promise(() => {}) });
+test('threat is converted into a safe request', async () => {
+  const translator = new DiplomaticTranslator();
+  const original = 'Я тебя найду и ударю!';
   const result = await translator.translate(original);
-  assert.equal(result.rewritten, original);
-  assert.equal(result.isToxic, false);
-  assert.equal(result.fallback, true);
-  assert.equal(result.reason, 'timeout');
+  assert.equal(result.isToxic, true);
+  assert.doesNotMatch(result.rewritten, /найду|ударю/iu);
+  assert.match(result.rewritten, /спокойно обсудить/iu);
 });
 
-test('invalid JSON gracefully falls back to original', async () => {
-  const original = 'Грубый текст';
-  const translator = translatorWith(null, { llmCall: async () => 'not-json' });
-  const result = await translator.translate(original);
-  assert.equal(result.rewritten, original);
-  assert.equal(result.isToxic, false);
-  assert.equal(result.fallback, true);
+test('explicit profanity is softened without an external service', async () => {
+  const translator = new DiplomaticTranslator();
+  const result = await translator.translate('Это дерьмо, переделывай!');
+  assert.equal(result.isToxic, true);
+  assert.doesNotMatch(result.rewritten, /дерьм/iu);
+  assert.match(result.rewritten, /космического хаоса/iu);
 });
 
-test('empty toxic rewrite gracefully falls back to original', async () => {
-  const original = 'Грубый текст';
-  const translator = translatorWith({ is_toxic: true, rewritten: '   ', style: 'absurd' });
-  const result = await translator.translate(original);
-  assert.equal(result.rewritten, original);
-  assert.equal(result.isToxic, false);
-  assert.equal(result.fallback, true);
-});
-
-test('same text is served from cache without another LLM call', async () => {
-  let calls = 0;
-  const translator = translatorWith(null, {
-    llmCall: async () => {
-      calls += 1;
-      return JSON.stringify({ is_toxic: true, rewritten: 'Мягкая версия', style: 'zen' });
-    }
-  });
-  await translator.translate('Одинаковая грубость');
-  const second = await translator.translate('Одинаковая грубость');
-  assert.equal(calls, 1);
+test('same text is served from cache', async () => {
+  const translator = new DiplomaticTranslator();
+  await translator.translate('Ты опять всё ужасно сделал');
+  const second = await translator.translate('Ты опять всё ужасно сделал');
   assert.equal(second.cached, true);
+  assert.equal(second.isToxic, true);
 });
 
-test('only first 500 characters go to LLM and untouched tail is preserved', async () => {
-  const original = `${'Я'.repeat(LLM_INPUT_LIMIT)}ХВОСТ`;
-  let received = '';
-  const translator = translatorWith(null, {
-    llmCall: async ({ text }) => {
-      received = text;
-      return JSON.stringify({ is_toxic: true, rewritten: 'Смягчённое начало', style: 'cute' });
-    }
-  });
+test('only first 500 characters are rewritten and untouched tail is preserved', async () => {
+  const original = `${'Ты ужасно сделал. '.repeat(40).slice(0, ANALYSIS_INPUT_LIMIT)}ХВОСТ-БЕЗ-ИЗМЕНЕНИЙ`;
+  const translator = new DiplomaticTranslator();
   const result = await translator.translate(original);
-  assert.equal(received.length, LLM_INPUT_LIMIT);
-  assert.equal(result.rewritten, 'Смягчённое началоХВОСТ');
+  assert.equal(result.isToxic, true);
+  assert.ok(result.rewritten.endsWith('ХВОСТ-БЕЗ-ИЗМЕНЕНИЙ'));
 });
 
-test('emoji-only messages skip LLM', async () => {
-  let calls = 0;
-  const translator = translatorWith(null, { llmCall: async () => { calls += 1; return '{}'; } });
+test('emoji-only messages skip analysis', async () => {
+  const translator = new DiplomaticTranslator();
   const result = await translator.translate('🎭😡');
-  assert.equal(calls, 0);
+  assert.equal(result.isToxic, false);
   assert.equal(result.rewritten, '🎭😡');
+  assert.equal(result.reason, 'skipped');
+});
+
+test('aggressive uppercase with repeated exclamation marks is softened', async () => {
+  const translator = new DiplomaticTranslator();
+  const result = await translator.translate('ПЕРЕДЕЛЫВАЙ ЭТО НЕМЕДЛЕННО!!!');
+  assert.equal(result.isToxic, true);
+  assert.notEqual(result.rewritten, 'ПЕРЕДЕЛЫВАЙ ЭТО НЕМЕДЛЕННО!!!');
 });
 
 test('LRU cache expires entries after one hour and caps size', () => {

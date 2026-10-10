@@ -1379,7 +1379,7 @@
         <section class="settings-section">
           <div class="settings-section-title">Общение</div>
           <div class="settings-toggle-list">
-            <label class="settings-toggle"><input type="checkbox" name="diplomaticFilter" ${s.diplomaticFilter ? 'checked' : ''}><span class="toggle-switch"></span><span><strong>Дипломатический фильтр</strong><small>Смягчать мои токсичные сообщения с помощью ИИ</small></span></label>
+            <label class="settings-toggle"><input type="checkbox" name="diplomaticFilter" ${s.diplomaticFilter ? 'checked' : ''}><span class="toggle-switch"></span><span><strong>Дипломатический фильтр</strong><small>Локально смягчать мои токсичные сообщения</small></span></label>
           </div>
         </section>
 

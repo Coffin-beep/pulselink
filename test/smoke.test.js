@@ -5,7 +5,6 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const net = require('node:net');
-const http = require('node:http');
 
 async function freePort() {
   return new Promise((resolve, reject) => {
@@ -42,12 +41,6 @@ async function json(response) {
 
 test('PulseLink API smoke flow', async () => {
   const port = await freePort();
-  const llmPort = await freePort();
-  const llmServer = http.createServer((_req, res) => {
-    res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ is_toxic: true, rewritten: 'Предлагаю обсудить это без запуска табуреток в космос.', style: 'absurd' }) } }] }));
-  });
-  await new Promise((resolve) => llmServer.listen(llmPort, '127.0.0.1', resolve));
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pulselink-test-'));
   const child = spawn(process.execPath, ['server.js'], {
     cwd: path.resolve(__dirname, '..'),
@@ -56,10 +49,7 @@ test('PulseLink API smoke flow', async () => {
       PORT: String(port),
       HOST: '127.0.0.1',
       PULSELINK_DATA_DIR: dataDir,
-      PULSELINK_ADMIN_PASSWORD: 'test-admin-pass',
-      DIPLOMATIC_LLM_URL: `http://127.0.0.1:${llmPort}/v1/chat/completions`,
-      DIPLOMATIC_LLM_API_KEY: 'test-key',
-      DIPLOMATIC_LLM_MODEL: 'test-model'
+      PULSELINK_ADMIN_PASSWORD: 'test-admin-pass'
     },
     stdio: ['ignore', 'pipe', 'pipe']
   });
@@ -120,9 +110,10 @@ test('PulseLink API smoke flow', async () => {
       headers: { authorization: `Bearer ${alice.token}`, 'content-type': 'application/json' },
       body: JSON.stringify({ text: 'Ты опять всё ужасно сделал' })
     }));
-    assert.equal(rewritten.message.text, 'Предлагаю обсудить это без запуска табуреток в космос.');
+    assert.notEqual(rewritten.message.text, 'Ты опять всё ужасно сделал');
+    assert.match(rewritten.message.text, /поразительно неудачно/u);
     assert.equal(rewritten.message.is_diplomatic_rewrite, true);
-    assert.equal(rewritten.message.rewrite_style, 'absurd');
+    assert.ok(['absurd', 'polite', 'cute', 'zen'].includes(rewritten.message.rewrite_style));
 
     const receivedByBob = await json(await fetch(`${baseUrl}/api/chats/${direct.chat.id}/messages`, {
       headers: { authorization: `Bearer ${bob.token}` }
@@ -185,7 +176,6 @@ test('PulseLink API smoke flow', async () => {
     assert.ok(stats.stats.messages >= 1);
   } finally {
     child.kill('SIGTERM');
-    await new Promise((resolve) => llmServer.close(resolve));
     fs.rmSync(dataDir, { recursive: true, force: true });
   }
 });
