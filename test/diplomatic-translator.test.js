@@ -10,8 +10,9 @@ test('toxic insult is rewritten locally', async () => {
   const result = await translator.translate(original);
   assert.equal(result.isToxic, true);
   assert.notEqual(result.rewritten, original);
-  assert.match(result.rewritten, /виртуоз спорных решений/u);
-  assert.ok(['absurd', 'polite', 'cute', 'zen'].includes(result.style));
+  assert.match(result.rewritten, /почётный чемпион по спорным решениям/u);
+  assert.ok(['absurd', 'polite', 'cute'].includes(result.style));
+  assert.match(result.rewritten, /кактус|хомяк|пингвин|дракон|капибар|табуреток/u);
 });
 
 test('neutral text remains unchanged', async () => {
@@ -38,7 +39,7 @@ test('threat is converted into a safe request', async () => {
   const result = await translator.translate(original);
   assert.equal(result.isToxic, true);
   assert.doesNotMatch(result.rewritten, /найду|ударю/iu);
-  assert.match(result.rewritten, /спокойно обсудить/iu);
+  assert.match(result.rewritten, /спокойно.*обсудить/iu);
 });
 
 test('explicit profanity is softened without an external service', async () => {
@@ -46,7 +47,38 @@ test('explicit profanity is softened without an external service', async () => {
   const result = await translator.translate('Это дерьмо, переделывай!');
   assert.equal(result.isToxic, true);
   assert.doesNotMatch(result.rewritten, /дерьм/iu);
-  assert.match(result.rewritten, /космического хаоса/iu);
+  assert.match(result.rewritten, /бутерброд с хаосом/iu);
+});
+
+test('expanded insult dictionary catches common forms', async () => {
+  const translator = new DiplomaticTranslator();
+  const samples = [
+    'Ты дебил', 'Какой же ты кретин', 'Он тупорылый', 'Ты тупой',
+    'Ну и придурок', 'Долбоёб какой-то', 'Полный дегенерат', 'Безмозглый тип',
+    'Рукожоп всё сломал', 'Вот же мразь', 'Какая гнида', 'Ублюдок',
+    'Засранец', 'Говнюк', 'Ты чмо', 'Какой лох', 'Козёл', 'Скотина',
+    'Шавка', 'Балбес', 'Остолоп', 'Клоун несчастный', 'Неадекват',
+    'Баран', 'Психопат', 'Конченый человек'
+  ];
+  for (const sample of samples) {
+    const result = await translator.translate(sample);
+    assert.equal(result.isToxic, true, `Не распознано: ${sample}`);
+    assert.notEqual(result.rewritten, sample);
+  }
+});
+
+test('obfuscated insults with punctuation are detected', async () => {
+  const translator = new DiplomaticTranslator();
+  const result = await translator.translate('Ты и.д.и.о.т!');
+  assert.equal(result.isToxic, true);
+  assert.doesNotMatch(result.rewritten, /и\.д\.и\.о\.т/iu);
+});
+
+test('rewrites are comedic rather than philosophical', async () => {
+  const translator = new DiplomaticTranslator();
+  const result = await translator.translate('Ты отвратительный мудак');
+  assert.match(result.rewritten, /кактус|хомяк|пингвин|дракон|капибар|табуреток/u);
+  assert.doesNotMatch(result.rewritten, /вдохн|выдохн|осознан|гармони|мудрост/iu);
 });
 
 test('same text is served from cache', async () => {

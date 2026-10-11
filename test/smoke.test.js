@@ -111,7 +111,7 @@ test('PulseLink API smoke flow', async () => {
       body: JSON.stringify({ text: 'Ты опять всё ужасно сделал' })
     }));
     assert.notEqual(rewritten.message.text, 'Ты опять всё ужасно сделал');
-    assert.match(rewritten.message.text, /поразительно неудачно/u);
+    assert.match(rewritten.message.text, /кактус|хомяк|пингвин|дракон|капибар|табуреток/u);
     assert.equal(rewritten.message.is_diplomatic_rewrite, true);
     assert.ok(['absurd', 'polite', 'cute', 'zen'].includes(rewritten.message.rewrite_style));
 
